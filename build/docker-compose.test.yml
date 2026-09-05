@@ -1,0 +1,22 @@
+services:
+  pg-shard-1:
+    image: postgres:17
+    container_name: pg-shard-1
+    environment:
+      POSTGRES_DB: ${PG_SHARD_1_DB_NAME}
+      POSTGRES_USER: ${PG_SHARD_1_USER}
+      POSTGRES_PASSWORD: ${PG_SHARD_1_PASSWORD}
+    ports:
+      - "${PG_SHARD_1_PORT}:5432"
+    restart: unless-stopped
+
+  pg-shard-2:
+    image: postgres:17
+    container_name: pg-shard-2
+    environment:
+      POSTGRES_DB: ${PG_SHARD_2_DB_NAME}
+      POSTGRES_USER: ${PG_SHARD_2_USER}
+      POSTGRES_PASSWORD: ${PG_SHARD_2_PASSWORD}
+    ports:
+      - "${PG_SHARD_2_PORT}:5432"
+    restart: unless-stopped
