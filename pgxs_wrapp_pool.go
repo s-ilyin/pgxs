@@ -12,7 +12,7 @@ import (
 // PoolManager управляет пулами соединений для всех шардов.
 type wrapPool struct {
 	mu     sync.RWMutex
-	pools  map[string]*pgxpool.Pool // имя шарда -> пул
+	pools  map[string]RetryPool // имя шарда -> пул
 	config *Config
 	opts   []PoolOption // опции, применённые при создании
 }
@@ -75,7 +75,7 @@ func WithPoolConnConfig(fn func(*pgxpool.Config)) PoolOption {
 // Если какой-либо шард недоступен, возвращается ошибка, а все уже созданные пулы закрываются.
 func newPool(ctx context.Context, cfg *Config, opts ...PoolOption) (*wrapPool, error) {
 	pm := &wrapPool{
-		pools:  make(map[string]*pgxpool.Pool, len(cfg.Shards)),
+		pools:  make(map[string]RetryPool, len(cfg.Shards)),
 		config: cfg,
 		opts:   opts,
 	}
@@ -107,7 +107,7 @@ func newPool(ctx context.Context, cfg *Config, opts ...PoolOption) (*wrapPool, e
 			return nil, fmt.Errorf("shard %s is not reachable: %w", shard.Name, err)
 		}
 
-		pm.pools[shard.Name] = pool
+		pm.pools[shard.Name] = NewRetryPool(pool, cfg.Retry)
 	}
 
 	return pm, nil
@@ -115,7 +115,7 @@ func newPool(ctx context.Context, cfg *Config, opts ...PoolOption) (*wrapPool, e
 
 // GetPool возвращает pgxpool.Pool для указанного шарда.
 // Если шард не найден, возвращает ошибку.
-func (wp *wrapPool) GetPool(shardName string) (*pgxpool.Pool, error) {
+func (wp *wrapPool) GetPool(shardName string) (RetryPool, error) {
 	wp.mu.RLock()
 	defer wp.mu.RUnlock()
 
@@ -132,8 +132,8 @@ func (wp *wrapPool) Stats() map[string]*pgxpool.Stat {
 	defer wp.mu.RUnlock()
 
 	stats := make(map[string]*pgxpool.Stat, len(wp.pools))
-	for name, pool := range wp.pools {
-		stats[name] = pool.Stat()
+	for name, rp := range wp.pools {
+		stats[name] = rp.Stat()
 	}
 	return stats
 }

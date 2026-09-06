@@ -4,8 +4,6 @@ import (
 	"context"
 	"strconv"
 	"strings"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Client – основной маршрутизатор запросов по шардам.
@@ -16,6 +14,7 @@ type Client struct {
 	maxParallel    int
 	batchTx        bool
 	schemaReplacer func(string, string) string
+	poolOpts       []PoolOption
 }
 
 // ClientOption – функциональная опция для клиента.
@@ -44,6 +43,13 @@ func WithSchemaReplacer(fn func(sql, schema string) string) ClientOption {
 	}
 }
 
+// WithPoolOptions передаёт настройки пула в клиент.
+func WithPoolOptions(opts ...PoolOption) ClientOption {
+	return func(c *Client) {
+		c.poolOpts = append(c.poolOpts, opts...)
+	}
+}
+
 // NewClient создаёт новый клиент с заданным конфигом и опциями.
 func New(ctx context.Context, cfg *Config, opts ...ClientOption) (*Client, error) {
 	if err := cfg.Validate(); err != nil {
@@ -53,21 +59,29 @@ func New(ctx context.Context, cfg *Config, opts ...ClientOption) (*Client, error
 	if err != nil {
 		return nil, err
 	}
-	pools, err := newPool(ctx, cfg)
-	if err != nil {
-		return nil, err
+
+	if cfg.Retry.MaxAttempts == 0 {
+		cfg.Retry.MaxAttempts = 1
+		cfg.Retry.BaseDelay = 0
+		cfg.Retry.MaxDelay = 0
 	}
 
 	c := &Client{
 		config:      cfg,
 		mapping:     mapping,
-		wrapPool:    pools,
 		maxParallel: 32,
 		batchTx:     true,
+		poolOpts:    []PoolOption{},
 	}
 	for _, opt := range opts {
 		opt(c)
 	}
+	wrapPool, err := newPool(ctx, cfg, c.poolOpts...)
+	if err != nil {
+		return nil, err
+	}
+	c.wrapPool = wrapPool
+
 	return c, nil
 }
 
@@ -94,7 +108,7 @@ func (c *Client) replaceSchema(sql, schema string) string {
 	return strings.ReplaceAll(sql, "{schema}", schema)
 }
 
-func (c *Client) getPoolByBucket(bucketID BucketID) (*pgxpool.Pool, string, error) {
+func (c *Client) getPoolByBucket(bucketID BucketID) (RetryPool, string, error) {
 	shard, schema, err := c.resolve(bucketID)
 	if err != nil {
 		return nil, "", err

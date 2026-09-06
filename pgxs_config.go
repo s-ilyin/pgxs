@@ -23,6 +23,7 @@ type Config struct {
 	SchemaPrefix string         `json:"schema_prefix"`
 	Shards       []Shard        `json:"shards"`
 	Mapping      []MappingEntry `json:"mapping"`
+	Retry        RetryConfig
 }
 
 func LoadConfig(r io.Reader) (*Config, error) {

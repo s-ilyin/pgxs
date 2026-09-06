@@ -234,7 +234,7 @@ func TestClient_Bulk(t *testing.T) {
 	setup := setupTestClient(t)
 	t.Cleanup(func() { setupTestClose(setup) })
 
-	t.Run("Bulk insert", func(t *testing.T) {
+	t.Run("Exec insert", func(t *testing.T) {
 		defer cleanupTestData(t, setup)
 
 		users := []testUser{
@@ -243,7 +243,7 @@ func TestClient_Bulk(t *testing.T) {
 			{ID: KeyShardID("b3"), Name: "Bulk3", Age: 30},
 		}
 
-		result, err := pgxs.Bulk(t.Context(), setup.client, users,
+		result, err := pgxs.Exec(t.Context(), setup.client, users,
 			func(u testUser) []byte { return u.ID.PreHash() },
 			func(u testUser) (string, []any) {
 				return `INSERT INTO {schema}.users (id, name, age) VALUES ($1, $2, $3)`,
@@ -251,12 +251,8 @@ func TestClient_Bulk(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-		for shard := range result.ShardResults {
-			require.NoError(t, result.ShardResults[shard].Err)
-		}
-
-		require.Equal(t, 3, result.TotalQueries)
-		require.Equal(t, int64(3), result.TotalRowsAffected)
+		require.Equal(t, 3, result.Total)
+		require.Equal(t, int64(3), result.RowsAffected)
 
 		var total int
 		for b, p := range setup.buckets {
@@ -506,9 +502,9 @@ func TestClient_EachRow(t *testing.T) {
 		}...,
 	)
 
-	t.Run("EachRow all rows", func(t *testing.T) {
+	t.Run("ForEachRow all rows", func(t *testing.T) {
 		var ids []string
-		err := setup.client.EachRow(t.Context(),
+		err := setup.client.ForEachRow(t.Context(),
 			func(rows pgx.Rows) error {
 				var id string
 				if err := rows.Scan(&id); err != nil {
@@ -525,9 +521,9 @@ func TestClient_EachRow(t *testing.T) {
 		require.ElementsMatch(t, expected, ids)
 	})
 
-	t.Run("EachRow with filter", func(t *testing.T) {
+	t.Run("ForEachRow with filter", func(t *testing.T) {
 		var names []string
-		err := setup.client.EachRow(t.Context(),
+		err := setup.client.ForEachRow(t.Context(),
 			func(rows pgx.Rows) error {
 				var name string
 				if err := rows.Scan(&name); err != nil {
@@ -544,8 +540,8 @@ func TestClient_EachRow(t *testing.T) {
 		require.ElementsMatch(t, expected, names)
 	})
 
-	t.Run("EachRow with error in handler", func(t *testing.T) {
-		err := setup.client.EachRow(t.Context(),
+	t.Run("ForEachRow with error in handler", func(t *testing.T) {
+		err := setup.client.ForEachRow(t.Context(),
 			func(rows pgx.Rows) error {
 				var id string
 				if err := rows.Scan(&id); err != nil {
@@ -585,7 +581,7 @@ func TestClient_ErrorHandling(t *testing.T) {
 
 	t.Run("Bulk with empty items", func(t *testing.T) {
 		users := []testUser{}
-		result, err := pgxs.Bulk(t.Context(), setup.client, users,
+		result, err := pgxs.Exec(t.Context(), setup.client, users,
 			func(u testUser) []byte { return u.ID.PreHash() },
 			func(u testUser) (string, []any) {
 				return `INSERT INTO {schema}.users (id, name) VALUES ($1, $2)`,
@@ -593,7 +589,7 @@ func TestClient_ErrorHandling(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-		require.Equal(t, 0, result.TotalQueries)
-		require.Equal(t, int64(0), result.TotalRowsAffected)
+		require.Equal(t, 0, result.Total)
+		require.Equal(t, int64(0), result.RowsAffected)
 	})
 }

@@ -11,12 +11,12 @@ import (
 
 // ---- EachRow (параллельные запросы на всех бакетах) ----
 
-// EachRow выполняет SELECT на всех бакетах и вызывает handler для каждой строки.
+// ForEachRow выполняет Query на всех бакетах и вызывает handler для каждой строки.
 // Каждый шард обрабатывается параллельно с ограничением через семафор.
 // Использует errgroup для управления ошибками и отменой.
-func (c *Client) EachRow(
+func (c *Client) ForEachRow(
 	ctx context.Context,
-	handle func(pgx.Rows) error,
+	scanRows func(pgx.Rows) error,
 	sql string,
 	args ...any,
 ) error {
@@ -78,7 +78,7 @@ func (c *Client) EachRow(
 				}
 
 				for rows.Next() {
-					if err := handle(rows); err != nil {
+					if err := scanRows(rows); err != nil {
 						rows.Close()
 						return fmt.Errorf("handle error on shard %s, bucket %d: %w", shard, buckets[i], err)
 					}

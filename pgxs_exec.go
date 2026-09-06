@@ -10,29 +10,29 @@ import (
 )
 
 // BulkResult результат массовой операции.
-type BulkResult struct {
-	ShardResults      map[string]ShardBatchResult // имя шарда -> результат
-	TotalQueries      int                         // общее количество выполненных запросов
-	TotalRowsAffected int64                       // суммарное количество затронутых строк
+type ExecResult struct {
+	BatchResults map[string]BatchResult // имя шарда -> результат (только успешные)
+	RowsAffected int64                  // суммарное количество затронутых строк
+	Total        int                    // общее количество выполненных запросов
 }
 
-// ShardBatchResult результат батча на одном шарде.
-type ShardBatchResult struct {
+// BatchResult результат батча на одном шарде.
+type BatchResult struct {
 	CommandTags []pgconn.CommandTag // теги в порядке добавления запросов
-	Err         error               // ошибка выполнения батча (если есть)
 }
 
 // Bulk выполняет массовую операцию для произвольных элементов.
 // Каждый элемент преобразуется в SQL-запрос через query.
 // Запросы группируются по шардам и отправляются пакетами (batch).
 // Автоматически подставляется {schema} на основе bucketID элемента.
-func Bulk[T any](
+// При возникновении любой ошибки выполнение прерывается и ошибка возвращается.
+func Exec[T any](
 	ctx context.Context,
 	client *Client,
 	items []T,
-	keyShard func(T) []byte,
+	prehasher func(T) []byte,
 	query func(T) (sql string, args []any),
-) (*BulkResult, error) {
+) (*ExecResult, error) {
 	type itemWithBucket struct {
 		item     T
 		bucketID BucketID
@@ -40,8 +40,8 @@ func Bulk[T any](
 	groups := make(map[string][]itemWithBucket)
 
 	for _, item := range items {
-		key := keyShard(item)
-		bucketID := BucketID(HashKey(key, client.config.Buckets))
+		prehash := prehasher(item)
+		bucketID := BucketID(HashKey(prehash, client.config.Buckets))
 		shard, err := client.mapping.GetShard(bucketID)
 		if err != nil {
 			return nil, fmt.Errorf("bucket %d: %w", bucketID, err)
@@ -49,22 +49,20 @@ func Bulk[T any](
 		groups[shard] = append(groups[shard], itemWithBucket{item: item, bucketID: bucketID})
 	}
 
-	result := &BulkResult{
-		ShardResults: make(map[string]ShardBatchResult, len(groups)),
+	result := &ExecResult{
+		BatchResults: make(map[string]BatchResult, len(groups)),
 	}
 
 	for shard, entries := range groups {
 		pool, err := client.wrapPool.GetPool(shard)
 		if err != nil {
-			result.ShardResults[shard] = ShardBatchResult{Err: err}
-			continue
+			return nil, fmt.Errorf("get pool for shard %s: %w", shard, err)
 		}
 
 		// Получаем соединение для батча
 		conn, err := pool.Acquire(ctx)
 		if err != nil {
-			result.ShardResults[shard] = ShardBatchResult{Err: err}
-			continue
+			return nil, fmt.Errorf("acquire connection for shard %s: %w", shard, err)
 		}
 		defer conn.Release()
 
@@ -72,8 +70,7 @@ func Bulk[T any](
 		if client.batchTx {
 			tx, err = conn.Begin(ctx)
 			if err != nil {
-				result.ShardResults[shard] = ShardBatchResult{Err: err}
-				continue
+				return nil, fmt.Errorf("begin tx on shard %s: %w", shard, err)
 			}
 			defer tx.Rollback(ctx)
 		}
@@ -94,34 +91,35 @@ func Bulk[T any](
 		}
 		defer br.Close()
 
+		// Обрабатываем результаты, возвращая ошибку при первой проблеме
 		tags := make([]pgconn.CommandTag, 0, batch.Len())
-		var batchErr error
-		for range batch.Len() {
-			tag, err := br.Exec()
+		for i := range batch.Len() {
+			var tag pgconn.CommandTag
+			tag, err = br.Exec()
 			if err != nil {
-				batchErr = err
-				break
+				return nil, fmt.Errorf("batch results exec on shard %s, query %d: %w", shard, i, err)
 			}
 			tags = append(tags, tag)
 		}
-		if batchErr != nil {
-			result.ShardResults[shard] = ShardBatchResult{Err: batchErr}
-			continue
+		err = br.Close()
+		if err != nil {
+			return nil, fmt.Errorf("batch results exec close %s: %w", shard, err)
 		}
 
+		// Если транзакция была, коммитим
 		if client.batchTx {
 			err := tx.Commit(ctx)
 			if err != nil {
-				result.ShardResults[shard] = ShardBatchResult{Err: err}
-				continue
+				return nil, fmt.Errorf("commit tx on shard %s: %w", shard, err)
 			}
 		}
 
-		result.ShardResults[shard] = ShardBatchResult{CommandTags: tags}
+		// Сохраняем успешные результаты
+		result.BatchResults[shard] = BatchResult{CommandTags: tags}
 		for _, tag := range tags {
-			result.TotalRowsAffected += tag.RowsAffected()
+			result.RowsAffected += tag.RowsAffected()
 		}
-		result.TotalQueries += len(tags)
+		result.Total += len(tags)
 	}
 
 	return result, nil
