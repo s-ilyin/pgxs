@@ -1,0 +1,17 @@
+all: false
+dir: "{{.InterfaceDir}}/mocks"                                     # все моки в корневую папку mocks
+filename: "{{.InterfaceName | snakecase}}.go"       # имя файла в snake_case
+force-file-write: true
+formatter: goimports
+log-level: warn
+pkgname: mocks                                      # пакет моков будет mocks
+structname: "{{.InterfaceName}}"
+inpackage: true
+recursive: true
+require-template-schema-exists: true
+template: testify
+template-schema: "{{.Template}}.schema.json"
+packages:
+  github.com/s-ilyin/pgxs:                           # ваш пакет
+    config:
+          all: true

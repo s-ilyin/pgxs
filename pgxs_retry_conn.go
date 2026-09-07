@@ -8,17 +8,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// RetryConner — интерфейс для RetryConn.
-type RetryConn interface {
-	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-	SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults
-	Begin(ctx context.Context) (pgx.Tx, error)
-	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error)
-	Release()
-}
-
 // RetryConn — обёртка над pgxpool.Conn с повторами.
 type retryConn struct {
 	conn     *pgxpool.Conn
