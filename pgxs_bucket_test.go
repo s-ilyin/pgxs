@@ -83,7 +83,7 @@ func TestBucketID_Validate(t *testing.T) {
 			err := tt.id.Validate(tt.max)
 			if tt.wantErr {
 				require.Error(t, err)
-				require.Equal(t, "bucket ID out of range", err.Error())
+				require.Equal(t, "bucket BucketID out of range", err.Error())
 			} else {
 				require.NoError(t, err)
 			}
@@ -166,16 +166,16 @@ func TestFromInt(t *testing.T) {
 }
 
 func TestFromInt_ErrorMessages(t *testing.T) {
-	t.Run("negative ID", func(t *testing.T) {
+	t.Run("negative BucketID", func(t *testing.T) {
 		_, err := FromInt(-1, 10)
 		require.Error(t, err)
-		require.Equal(t, "bucket ID must be non-negative", err.Error())
+		require.Equal(t, "bucket BucketID must be non-negative", err.Error())
 	})
 
 	t.Run("out of range", func(t *testing.T) {
 		_, err := FromInt(15, 10)
 		require.Error(t, err)
-		require.Equal(t, "bucket ID out of range", err.Error())
+		require.Equal(t, "bucket BucketID out of range", err.Error())
 	})
 }
 

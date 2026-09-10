@@ -10,11 +10,11 @@ func TestNewMapping(t *testing.T) {
 	cfg := &Config{
 		Buckets: 2,
 		Shards: []Shard{
-			{Name: "shard1", DSN: "..."},
+			{Name: "shard_1", DSN: "..."},
 		},
 		Mapping: []MappingEntry{
-			{Bucket: 0, Shard: "shard1"},
-			{Bucket: 1, Shard: "shard1"},
+			{Bucket: 0, Shard: "shard_1"},
+			{Bucket: 1, Shard: "shard_1"},
 		},
 	}
 
@@ -24,29 +24,13 @@ func TestNewMapping(t *testing.T) {
 
 	shard, err := m.GetShard(0)
 	require.NoError(t, err)
-	require.Equal(t, "shard1", shard)
+	require.Equal(t, "shard_1", shard)
 
 	shard, err = m.GetShard(1)
 	require.NoError(t, err)
-	require.Equal(t, "shard1", shard)
+	require.Equal(t, "shard_1", shard)
 
 	_, err = m.GetShard(2)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no shard for bucket")
-}
-
-func TestMapping_ShardNames(t *testing.T) {
-	cfg := &Config{
-		Buckets: 1,
-		Shards: []Shard{
-			{Name: "shard1", DSN: "..."},
-			{Name: "shard2", DSN: "..."},
-		},
-		Mapping: []MappingEntry{
-			{Bucket: 0, Shard: "shard1"},
-		},
-	}
-	m, _ := newMapping(cfg)
-	names := m.ShardNames()
-	require.ElementsMatch(t, []string{"shard1", "shard2"}, names)
 }

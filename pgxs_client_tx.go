@@ -1,8 +1,8 @@
 package pgxs
 
-import "context"
-
-// ---- Транзакции (начало) ----
+import (
+	"context"
+)
 
 func (c *Client) Begin(ctx context.Context, key PreHasher) (Tx, error) {
 	bucketID := BucketID(HashKey(key.PreHash(), c.config.Buckets))
@@ -18,5 +18,5 @@ func (c *Client) BeginBucket(ctx context.Context, bucketID BucketID) (Tx, error)
 	if err != nil {
 		return nil, err
 	}
-	return &txImpl{tx: tx, schema: schema, client: c}, nil
+	return &wrapTx{tx: tx, schema: schema, client: c}, nil
 }

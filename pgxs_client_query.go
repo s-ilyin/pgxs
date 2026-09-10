@@ -7,7 +7,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// ---- Одиночные операции с bucketID ----
 func (c *Client) ExecBucket(ctx context.Context, bucketID BucketID, sql string, args ...any) (pgconn.CommandTag, error) {
 	pool, schema, err := c.getPoolByBucket(bucketID)
 	if err != nil {

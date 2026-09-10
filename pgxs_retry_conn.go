@@ -30,29 +30,17 @@ func (rc *retryConn) Query(ctx context.Context, sql string, args ...any) (pgx.Ro
 
 // QueryRow возвращает обёртку с ретраями для одной строки.
 func (rc *retryConn) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
-	return &retryRow{
-		ctx:      ctx,
-		conn:     rc.conn,
-		sql:      sql,
-		args:     args,
-		retryCfg: rc.retryCfg,
-	}
+	return rc.conn.QueryRow(ctx, sql, args...)
 }
 
 // SendBatch отправляет батч с повторами.
 func (rc *retryConn) SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults {
-	return &retryBatchResults{
-		ctx:      ctx,
-		br:       rc.conn.SendBatch(ctx, batch),
-		retryCfg: rc.retryCfg,
-	}
+	return rc.conn.SendBatch(ctx, batch)
 }
 
 // BeginTx начинает транзакцию с опциями и повторами.
 func (rc *retryConn) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error) {
-	return withRetry(ctx, rc.retryCfg, func() (pgx.Tx, error) {
-		return rc.conn.BeginTx(ctx, txOptions)
-	})
+	return rc.conn.BeginTx(ctx, txOptions)
 }
 
 // Begin начинает транзакцию.

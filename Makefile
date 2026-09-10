@@ -16,29 +16,32 @@ PG_DSN_SHARD2 := $(PG_SHARD_2_DSN)
 .PHONY: help
 help:
 	@echo "Доступные команды:"
-	@echo "  make up              - Поднять контейнеры"
-	@echo "  make down            - Остановить контейнеры"
+	@echo "  make compose-up              - Поднять контейнеры"
+	@echo "  make compose-down            - Остановить контейнеры"
 	@echo "  make migrate         - Применить миграции ко всем шардам"
 	@echo "  make test            - Запустить юнит-тесты"
 	@echo "  make integration-test - Запустить интеграционные тесты (включает up, migrate, test, down)"
 	@echo "  make clean           - Остановить и удалить контейнеры с данными"
-	@echo "  make shell-shard1    - Подключиться к psql на shard1"
-	@echo "  make shell-shard2    - Подключиться к psql на shard2"
+	@echo "  make shell-shard_1    - Подключиться к psql на shard_1"
+	@echo "  make shell-shard_2    - Подключиться к psql на shard_2"
 
 .PHONY: up
-up:
-	$(DOCKER_COMPOSE) up -d
-	sleep 3
+up: compose-up migrate
 
-.PHONY: down
-down:
+.PHONY: compose-up
+compose-up:
+	$(DOCKER_COMPOSE) up -d
+	sleep 1
+
+.PHONY: compose-down
+compose-down:
 	$(DOCKER_COMPOSE) down
 
 .PHONY: migrate
 migrate:
-	@echo "Применяем миграции на shard1 (порт $(PG_SHARD_1_PORT))..."
+	@echo "Применяем миграции на shard_1 (порт $(PG_SHARD_1_PORT))..."
 	$(DOCKER_COMPOSE) exec -T pg-shard-1 psql -U $(PG_SHARD_1_USER) -d $(PG_SHARD_1_DB_NAME) < $(MIGRATION_DIR)/pg_shard_1.sql
-	@echo "Применяем миграции на shard2 (порт $(PG_SHARD_2_PORT))..."
+	@echo "Применяем миграции на shard_2 (порт $(PG_SHARD_2_PORT))..."
 	$(DOCKER_COMPOSE) exec -T pg-shard-2 psql -U $(PG_SHARD_2_USER) -d $(PG_SHARD_2_DB_NAME) < $(MIGRATION_DIR)/pg_shard_2.sql
 	@echo "Миграции применены"
 
@@ -58,10 +61,10 @@ integration-test: up migrate
 clean:
 	$(DOCKER_COMPOSE) down -v
 
-.PHONY: shell-shard1
-shell-shard1:
+.PHONY: shell-shard_1
+shell-shard_1:
 	$(DOCKER_COMPOSE) exec pg-shard-1 psql -U $(PG_SHARD_1_USER) -d $(PG_SHARD_1_DB_NAME)
 
-.PHONY: shell-shard2
-shell-shard2:
+.PHONY: shell-shard_2
+shell-shard_2:
 	$(DOCKER_COMPOSE) exec pg-shard-2 psql -U $(PG_SHARD_2_USER) -d $(PG_SHARD_2_DB_NAME)

@@ -50,14 +50,14 @@ func setupTestClient(t *testing.T) setupTest {
 		Buckets:      4,
 		SchemaPrefix: "bucket_",
 		Shards: []pgxs.Shard{
-			{Name: "shard1", DSN: dsn1},
-			{Name: "shard2", DSN: dsn2},
+			{Name: "shard_1", DSN: dsn1},
+			{Name: "shard_2", DSN: dsn2},
 		},
 		Mapping: []pgxs.MappingEntry{
-			{Bucket: 0, Shard: "shard1"},
-			{Bucket: 1, Shard: "shard1"},
-			{Bucket: 2, Shard: "shard2"},
-			{Bucket: 3, Shard: "shard2"},
+			{Bucket: 0, Shard: "shard_1"},
+			{Bucket: 1, Shard: "shard_1"},
+			{Bucket: 2, Shard: "shard_2"},
+			{Bucket: 3, Shard: "shard_2"},
 		},
 	}
 	s := setupTest{
@@ -157,7 +157,7 @@ func TestClient_Exec(t *testing.T) {
 		require.Equal(t, want, got)
 	})
 
-	t.Run("ExecBucket with BucketID", func(t *testing.T) {
+	t.Run("ExecBucket with ID", func(t *testing.T) {
 		defer cleanupTestData(t, setup)
 
 		want := testUser{
@@ -230,7 +230,7 @@ func TestClient_Query(t *testing.T) {
 	})
 }
 
-func TestClient_Bulk(t *testing.T) {
+func Test_Exec(t *testing.T) {
 	setup := setupTestClient(t)
 	t.Cleanup(func() { setupTestClose(setup) })
 
@@ -425,7 +425,7 @@ func TestClient_Transaction(t *testing.T) {
 	})
 }
 
-func TestClient_EachRow(t *testing.T) {
+func TestClient_ForEachRow(t *testing.T) {
 	setup := setupTestClient(t)
 	t.Cleanup(func() { setupTestClose(setup) })
 

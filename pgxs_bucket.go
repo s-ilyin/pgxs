@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-// BucketID представляет номер бакета (схемы).
+// BID представляет номер бакета (схемы) - bucket id.
 type BucketID uint
 
 // MaxBuckets представляет максимальное количество бакетов в кластере.
@@ -40,7 +40,7 @@ func (m MaxBuckets) LessOrEqual(id BucketID) bool {
 // Validate проверяет, что BucketID находится в допустимом диапазоне [0, max).
 func (b BucketID) Validate(max MaxBuckets) error {
 	if uint(b) >= uint(max) {
-		return errors.New("bucket ID out of range")
+		return errors.New("bucket BucketID out of range")
 	}
 	return nil
 }
@@ -58,7 +58,7 @@ func (b BucketID) Uint() uint {
 // FromInt создаёт BucketID из int с проверкой диапазона.
 func FromInt(id int, max MaxBuckets) (BucketID, error) {
 	if id < 0 {
-		return 0, errors.New("bucket ID must be non-negative")
+		return 0, errors.New("bucket BucketID must be non-negative")
 	}
 	b := BucketID(id)
 	if err := b.Validate(max); err != nil {

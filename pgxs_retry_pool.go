@@ -8,8 +8,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-
-
 // RetryPool — обёртка над pgxpool.Pool с автоматическими повторами.
 type retryPool struct {
 	pool     *pgxpool.Pool
@@ -30,11 +28,7 @@ func (rp *retryPool) Stat() *pgxpool.Stat {
 
 // SendBatch отправляет батч с повторами.
 func (rc *retryPool) SendBatch(ctx context.Context, batch *pgx.Batch) pgx.BatchResults {
-	return &retryBatchResults{
-		ctx:      ctx,
-		br:       rc.pool.SendBatch(ctx, batch),
-		retryCfg: rc.retryCfg,
-	}
+	return rc.pool.SendBatch(ctx, batch)
 }
 
 // Exec выполняет запрос с повторами.
@@ -53,49 +47,27 @@ func (rp *retryPool) Query(ctx context.Context, sql string, args ...any) (pgx.Ro
 
 // QueryRow возвращает обёртку с ретраями для сканирования одной строки.
 func (rp *retryPool) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
-	return &retryRow{
-		ctx:      ctx,
-		pool:     rp.pool,
-		sql:      sql,
-		args:     args,
-		retryCfg: rp.retryCfg,
-	}
+	return rp.pool.QueryRow(ctx, sql, args...)
 }
 
 // Ping проверяет доступность пула с повторами.
 func (rp *retryPool) Ping(ctx context.Context) error {
-	_, err := withRetry(ctx, rp.retryCfg, func() (struct{}, error) {
-		return struct{}{}, rp.pool.Ping(ctx)
-	})
-	return err
+	return rp.pool.Ping(ctx)
 }
 
 // Acquire возвращает соединение с повторами.
 func (rp *retryPool) Acquire(ctx context.Context) (RetryConn, error) {
-	conn, err := withRetry(ctx, rp.retryCfg, func() (*pgxpool.Conn, error) {
-		return rp.pool.Acquire(ctx)
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &retryConn{
-		conn:     conn,
-		retryCfg: rp.retryCfg,
-	}, nil
+	return rp.pool.Acquire(ctx)
 }
 
 // Begin начинает транзакцию с повторами.
 func (rp *retryPool) Begin(ctx context.Context) (pgx.Tx, error) {
-	return withRetry(ctx, rp.retryCfg, func() (pgx.Tx, error) {
-		return rp.pool.Begin(ctx)
-	})
+	return rp.pool.Begin(ctx)
 }
 
 // BeginTx начинает транзакцию с опциями и повторами.
 func (rp *retryPool) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error) {
-	return withRetry(ctx, rp.retryCfg, func() (pgx.Tx, error) {
-		return rp.pool.BeginTx(ctx, txOptions)
-	})
+	return rp.pool.BeginTx(ctx, txOptions)
 }
 
 // Close закрывает пул.

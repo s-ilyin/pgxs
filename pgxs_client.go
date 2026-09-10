@@ -37,22 +37,22 @@ type RetryConn interface {
 // Client – основной маршрутизатор запросов по шардам.
 type Client struct {
 	config         *Config
-	mapping        *mapping
-	wrapPool       *wrapPool
-	maxParallel    int
-	batchTx        bool
+	mapping        Mapping
+	wrapPool       WrapPool
 	schemaReplacer func(string, string) string
 	poolOpts       []PoolOption
+	concurrency    int
+	batchTx        bool
 }
 
 // ClientOption – функциональная опция для клиента.
 type ClientOption func(*Client)
 
-// WithMaxParallelQueries устанавливает максимальное число одновременных запросов в QueryAll.
+// WithMaxParallelQueries устанавливает максимальное число одновременных запросов при параллельным запросах.
 func WithMaxParallelQueries(n int) ClientOption {
 	return func(c *Client) {
 		if n > 0 {
-			c.maxParallel = n
+			c.concurrency = n
 		}
 	}
 }
@@ -97,7 +97,7 @@ func New(ctx context.Context, cfg *Config, opts ...ClientOption) (*Client, error
 	c := &Client{
 		config:      cfg,
 		mapping:     mapping,
-		maxParallel: 32,
+		concurrency: 4,
 		batchTx:     true,
 		poolOpts:    []PoolOption{},
 	}

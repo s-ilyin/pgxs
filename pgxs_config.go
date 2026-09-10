@@ -62,21 +62,21 @@ func (c *Config) Validate() error {
 
 	shardNames := make(map[string]bool)
 	for i, sh := range c.Shards {
-		if strings.TrimSpace(sh.Name) == "" {
+		if len(strings.TrimSpace(sh.Name)) == 0 {
 			return fmt.Errorf("shard[%d] name empty", i)
 		}
 		if shardNames[sh.Name] {
 			return fmt.Errorf("duplicate shard name %q", sh.Name)
 		}
 		shardNames[sh.Name] = true
-		if strings.TrimSpace(sh.DSN) == "" {
+		if len(strings.TrimSpace(sh.DSN)) == 0 {
 			return fmt.Errorf("shard %q DSN empty", sh.Name)
 		}
 	}
 
 	usedBuckets := make(map[BucketID]bool)
 	for _, entry := range c.Mapping {
-		if c.Buckets.Less(entry.Bucket) {
+		if c.Buckets.LessOrEqual(entry.Bucket) {
 			return fmt.Errorf("bucket %d out of range [0, %d)", entry.Bucket, c.Buckets)
 		}
 		if !shardNames[entry.Shard] {
@@ -88,9 +88,9 @@ func (c *Config) Validate() error {
 		usedBuckets[entry.Bucket] = true
 	}
 	// Проверяем, что все бакеты покрыты
-	for bucket := range c.Buckets {
-		if !usedBuckets[BucketID(bucket)] {
-			return fmt.Errorf("bucket %d has no mapping", bucket)
+	for b := range c.Buckets {
+		if !usedBuckets[BucketID(b)] {
+			return fmt.Errorf("bucket %d has no mapping", b)
 		}
 	}
 	return nil

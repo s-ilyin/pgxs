@@ -16,32 +16,32 @@ type Tx interface {
 	Rollback(ctx context.Context) error
 }
 
-// txImpl внутренняя реализация Tx.
-type txImpl struct {
+// wrapTx внутренняя реализация Tx.
+type wrapTx struct {
 	tx     pgx.Tx
 	schema string
 	client *Client
 }
 
-func (t *txImpl) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+func (t *wrapTx) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
 	sql = t.client.replaceSchema(sql, t.schema)
 	return t.tx.Exec(ctx, sql, args...)
 }
 
-func (t *txImpl) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+func (t *wrapTx) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
 	sql = t.client.replaceSchema(sql, t.schema)
 	return t.tx.Query(ctx, sql, args...)
 }
 
-func (t *txImpl) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
+func (t *wrapTx) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
 	sql = t.client.replaceSchema(sql, t.schema)
 	return t.tx.QueryRow(ctx, sql, args...)
 }
 
-func (t *txImpl) Commit(ctx context.Context) error {
+func (t *wrapTx) Commit(ctx context.Context) error {
 	return t.tx.Commit(ctx)
 }
 
-func (t *txImpl) Rollback(ctx context.Context) error {
+func (t *wrapTx) Rollback(ctx context.Context) error {
 	return t.tx.Rollback(ctx)
 }

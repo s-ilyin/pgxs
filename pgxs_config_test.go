@@ -12,13 +12,13 @@ func TestConfig_Validate(t *testing.T) {
 			Buckets:      4,
 			SchemaPrefix: "bucket_",
 			Shards: []Shard{
-				{Name: "shard1", DSN: "postgres://user:pass@localhost:5432/db"},
+				{Name: "shard_1", DSN: "postgres://user:pass@localhost:5432/db"},
 			},
 			Mapping: []MappingEntry{
-				{Bucket: 0, Shard: "shard1"},
-				{Bucket: 1, Shard: "shard1"},
-				{Bucket: 2, Shard: "shard1"},
-				{Bucket: 3, Shard: "shard1"},
+				{Bucket: 0, Shard: "shard_1"},
+				{Bucket: 1, Shard: "shard_1"},
+				{Bucket: 2, Shard: "shard_1"},
+				{Bucket: 3, Shard: "shard_1"},
 			},
 		}
 		err := cfg.Validate()
@@ -30,7 +30,7 @@ func TestConfig_Validate(t *testing.T) {
 			Buckets:      2,
 			SchemaPrefix: "bucket_",
 			Shards: []Shard{
-				{Name: "shard1", DSN: "postgres://..."},
+				{Name: "shard_1", DSN: "postgres://..."},
 			},
 			Mapping: []MappingEntry{},
 		}
@@ -44,11 +44,11 @@ func TestConfig_Validate(t *testing.T) {
 			Buckets:      2,
 			SchemaPrefix: "bucket_",
 			Shards: []Shard{
-				{Name: "shard1", DSN: "postgres://..."},
+				{Name: "shard_1", DSN: "postgres://..."},
 			},
 			Mapping: []MappingEntry{
-				{Bucket: 0, Shard: "shard1"},
-				{Bucket: 2, Shard: "shard1"}, // bucket out of range
+				{Bucket: 0, Shard: "shard_1"},
+				{Bucket: 2, Shard: "shard_1"}, // bucket out of range
 			},
 		}
 		err := cfg.Validate()
@@ -61,14 +61,14 @@ func TestConfig_Validate(t *testing.T) {
 			Buckets:      1,
 			SchemaPrefix: "bucket_",
 			Shards: []Shard{
-				{Name: "shard1", DSN: "postgres://..."},
+				{Name: "shard_1", DSN: "postgres://..."},
 			},
 			Mapping: []MappingEntry{
-				{Bucket: 0, Shard: "shard2"},
+				{Bucket: 0, Shard: "shard_2"},
 			},
 		}
 		err := cfg.Validate()
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "shard \"shard2\" not found")
+		require.Contains(t, err.Error(), "shard \"shard_2\" not found")
 	})
 }

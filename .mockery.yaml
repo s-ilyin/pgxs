@@ -1,11 +1,11 @@
 all: false
-dir: "{{.InterfaceDir}}/mocks"                                     # все моки в корневую папку mocks
-filename: "{{.InterfaceName | snakecase}}.go"       # имя файла в snake_case
+dir: "."
+filename: "pgxs_{{.InterfaceName | snakecase}}_mock.go"       # имя файла в snake_case
 force-file-write: true
 formatter: goimports
 log-level: warn
-pkgname: mocks                                      # пакет моков будет mocks
-structname: "{{.InterfaceName}}"
+pkgname: pgxs                                      # пакет моков будет mocks
+structname: "{{.InterfaceName}}Mock"
 inpackage: true
 recursive: true
 require-template-schema-exists: true
@@ -14,4 +14,16 @@ template-schema: "{{.Template}}.schema.json"
 packages:
   github.com/s-ilyin/pgxs:                           # ваш пакет
     config:
-          all: true
+        all: true
+  github.com/jackc/pgx/v5:
+    config:
+      filename: "pgx_{{.InterfaceName | snakecase}}_mock.go"
+      structname: "Pgx{{.InterfaceName}}Mock"
+      dir: "mocks"
+      inpackage: false
+      pkgname: mocks 
+    interfaces:
+      Tx:
+      BatchResults:
+      Row:
+      Rows:

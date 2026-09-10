@@ -1,6 +1,14 @@
 package pgxs
 
-import "fmt"
+import (
+	"fmt"
+
+	
+)
+
+type Mapping interface {
+	GetShard(bucketID BucketID) (string, error)
+}
 
 type mapping struct {
 	bucketToShard map[BucketID]string
@@ -35,8 +43,4 @@ func (m *mapping) GetShard(bucketID BucketID) (string, error) {
 		return "", fmt.Errorf("no shard for bucket %d", bucketID)
 	}
 	return shard, nil
-}
-
-func (m *mapping) ShardNames() []string {
-	return m.shardNames
 }

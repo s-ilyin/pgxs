@@ -9,6 +9,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type WrapPool interface {
+	GetPool(shardName string) (RetryPool, error)
+	Stats() map[string]*pgxpool.Stat
+	Close()
+}
+
 // PoolManager управляет пулами соединений для всех шардов.
 type wrapPool struct {
 	mu     sync.RWMutex

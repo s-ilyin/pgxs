@@ -1,7 +1,6 @@
 package pgxs
 
 import (
-	"context"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -49,9 +48,6 @@ func isRetryable(err error) bool {
 			return true
 		}
 	}
-	// Проверяем ошибки контекста
-	if err == context.DeadlineExceeded || err == context.Canceled {
-		return true
-	}
+
 	return false
 }

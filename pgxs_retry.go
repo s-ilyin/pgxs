@@ -6,6 +6,42 @@ import (
 	"time"
 )
 
+func withRetryErr(
+	ctx context.Context,
+	cfg RetryConfig,
+	fn func() error,
+) error {
+	var lastErr error
+
+	for attempt := range cfg.MaxAttempts {
+		// Проверяем контекст перед вызовом fn
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		if attempt > 0 {
+			if !wait(ctx, cfg, attempt) {
+				return ctx.Err()
+			}
+		}
+
+		err := fn()
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+		if !isRetryable(err) {
+			return err
+		}
+	}
+
+	return fmt.Errorf("with retry: %w", &RetryError{
+		Err:      lastErr,
+		Attempts: cfg.MaxAttempts,
+	})
+}
+
 // withRetry — универсальная функция для выполнения операций с повторами.
 // fn — функция, которая выполняет операцию и возвращает результат и ошибку.
 func withRetry[T any](
@@ -17,6 +53,11 @@ func withRetry[T any](
 	var lastErr error
 
 	for attempt := range cfg.MaxAttempts {
+		// Проверяем контекст перед вызовом fn
+		if err := ctx.Err(); err != nil {
+			return zero, err
+		}
+
 		if attempt > 0 {
 			if !wait(ctx, cfg, attempt) {
 				return zero, ctx.Err()
