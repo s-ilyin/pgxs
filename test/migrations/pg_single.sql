@@ -1,0 +1,27 @@
+-- Создаём все 4 схемы для одиночного шарда.
+DO $$
+DECLARE
+    i INT;
+BEGIN
+    FOR i IN 0..3 LOOP
+        EXECUTE format('CREATE SCHEMA IF NOT EXISTS bucket_%s', i);
+    END LOOP;
+END $$;
+
+-- Создаём таблицу users в каждой схеме.
+DO $$
+DECLARE
+    schema_name TEXT;
+    schemas TEXT[] := ARRAY['bucket_0', 'bucket_1', 'bucket_2', 'bucket_3'];
+BEGIN
+    FOREACH schema_name IN ARRAY schemas
+    LOOP
+        EXECUTE format('
+            CREATE TABLE IF NOT EXISTS %I.users (
+                id VARCHAR(32) PRIMARY KEY,
+                name TEXT NOT NULL,
+                age INT
+            )
+        ', schema_name);
+    END LOOP;
+END $$;

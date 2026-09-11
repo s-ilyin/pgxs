@@ -1,0 +1,50 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: pg-shard-1_syncon_1shard
+    static_configs:
+      - targets: ["exporter-pg1:9187"]
+        labels:
+          pg: "pg-shard-1"
+          scenario: "syncon_1shard"
+
+  - job_name: pg-shard-2_syncoff_1shard
+    static_configs:
+      - targets: ["exporter-pg2:9187"]
+        labels:
+          pg: "pg-shard-2"
+          scenario: "syncoff_1shard"
+
+  - job_name: pg-shard-3_syncon_2shards
+    static_configs:
+      - targets: ["exporter-pg3:9187"]
+        labels:
+          pg: "pg-shard-3"
+          scenario: "syncon_2shards"
+
+  - job_name: pg-shard-4_syncon_2shards
+    static_configs:
+      - targets: ["exporter-pg4:9187"]
+        labels:
+          pg: "pg-shard-4"
+          scenario: "syncon_2shards"
+
+  - job_name: pg-shard-5_syncoff_2shards
+    static_configs:
+      - targets: ["exporter-pg5:9187"]
+        labels:
+          pg: "pg-shard-5"
+          scenario: "syncoff_2shards"
+
+  - job_name: pg-shard-6_syncoff_2shards
+    static_configs:
+      - targets: ["exporter-pg6:9187"]
+        labels:
+          pg: "pg-shard-6"
+          scenario: "syncoff_2shards"

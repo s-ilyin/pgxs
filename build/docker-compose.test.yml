@@ -1,7 +1,7 @@
 services:
-  pg-shard-1:
+  pg-shard-1-cluster:
     image: postgres:17
-    container_name: pg-shard-1
+    container_name: pg-shard-1-cluster
     environment:
       POSTGRES_DB: ${PG_SHARD_1_DB_NAME}
       POSTGRES_USER: ${PG_SHARD_1_USER}
@@ -10,9 +10,9 @@ services:
       - "${PG_SHARD_1_PORT}:5432"
     restart: unless-stopped
 
-  pg-shard-2:
+  pg-shard-2-cluster:
     image: postgres:17
-    container_name: pg-shard-2
+    container_name: pg-shard-2-cluster
     environment:
       POSTGRES_DB: ${PG_SHARD_2_DB_NAME}
       POSTGRES_USER: ${PG_SHARD_2_USER}

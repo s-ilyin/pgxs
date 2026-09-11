@@ -6,33 +6,44 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/sync/errgroup"
 )
 
+// ---------------------------------------------------------------------------
+// Query.
+// ---------------------------------------------------------------------------
+
 // Query выполняет массовые запросы с чтением данных (например, SELECT или UPDATE ... RETURNING).
 // Для каждого элемента вызывается query, который должен вернуть SQL и аргументы.
-// Затем для каждого запроса вызывается scanRows для обработки каждой строки результата.
+// Для каждой строки результата вызывается scanRows, возвращающая значение типа R.
+// Все собранные значения возвращаются в одном слайсе.
+//
+// Важно: scanRows НЕ должна иметь побочных эффектов — при retry (например, при 40001/40P01)
+// запрос будет выполнен заново, и буфер попытки полностью сбрасывается, поэтому дублирования
+// значений не произойдёт. Пользователь получает уже собранные результаты.
+//
 // Все шарды обрабатываются параллельно с ограничением через client.concurrency.
-// Возвращает ошибку, если хотя бы один запрос завершился ошибкой (объединяет все ошибки).
+// Возвращает собранные результаты и ошибку (объединение ошибок по всем шардам).
 // Транзакции используются атомарно на уровне шарда, если client.batchTx == true.
-func Query[T any](
+func Query[T any, R any](
 	ctx context.Context,
 	client *Client,
 	src []T,
 	prehasher func(T) []byte,
 	query func(T) (sql string, args []any),
-	scanRows func(pgx.Rows) error,
-) error {
+	scanRows func(pgx.Rows) (R, error),
+) ([]R, error) {
 	if scanRows == nil {
-		return errors.New("func scanRows is nil")
+		return nil, errors.New("func scanRows is nil")
 	}
 	if query == nil {
-		return errors.New("func query is nil")
+		return nil, errors.New("func query is nil")
 	}
 	if prehasher == nil {
-		return errors.New("func prehasher is nil")
+		return nil, errors.New("func prehasher is nil")
 	}
 
 	type rowWithBucket struct {
@@ -46,13 +57,13 @@ func Query[T any](
 		bucketID := BucketIdFromHash(prehash, client.config.Buckets)
 		shard, err := client.mapping.GetShard(bucketID)
 		if err != nil {
-			return fmt.Errorf("mapping error for bucket %d: %w", bucketID, err)
+			return nil, fmt.Errorf("mapping error for bucket %d: %w", bucketID, err)
 		}
 		groups[shard] = append(groups[shard], rowWithBucket{row: row, bucketID: bucketID})
 	}
 
 	if len(groups) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// errgroup для управления горутинами и ограничения параллелизма
@@ -60,13 +71,23 @@ func Query[T any](
 	limit := min(client.concurrency, len(groups))
 	eg.SetLimit(limit)
 
-	var mu sync.Mutex
-	var errs []error
+	var (
+		mu     sync.Mutex
+		errs   []error
+		result []R
+	)
 
 	for shard, entries := range groups {
 		eg.Go(func() error {
-			// Оборачиваем всю операцию на шарде в withRetryErr
+			// Локальный буфер попытки. Изолирован между попытками внутри withRetryErr,
+			// поэтому при retry дубликатов не будет.
+			var shardResult []R
+
 			shardErr := withRetryErr(ctx, client.config.Retry, func() error {
+				// Сбрасываем буфер перед каждой попыткой — ключевой момент для retry.
+				clear(shardResult)
+				shardResult = shardResult[:0]
+
 				pool, err := client.wrapPool.GetPool(shard)
 				if err != nil {
 					return fmt.Errorf("get pool: %w", err)
@@ -102,69 +123,79 @@ func Query[T any](
 				}
 				defer br.Close()
 
-				var shardErr error
+				var (
+					tFirstReply time.Time
+					loopErr     error
+				)
 
 				for i := range batch.Len() {
 					// Проверяем отмену контекста
-					err := ctx.Err()
-					if err != nil {
-						shardErr = err
+					if err := ctx.Err(); err != nil {
+						loopErr = err
 						break
 					}
 
 					rows, err := br.Query()
 					if err != nil {
-						shardErr = fmt.Errorf("query %d: %w", i, err)
+						loopErr = fmt.Errorf("query %d: %w", i, err)
 						break
 					}
-					defer rows.Close()
 
 					// Перебираем все строки
 					for rows.Next() {
-						if err := scanRows(rows); err != nil {
-							shardErr = fmt.Errorf("scanRows on query %d: %w", i, err)
+						if tFirstReply.IsZero() {
+							tFirstReply = time.Now()
+						}
+						res, err := scanRows(rows)
+						if err != nil {
+							rows.Close()
+							loopErr = fmt.Errorf("scanRows on query %d: %w", i, err)
 							break
 						}
+						shardResult = append(shardResult, res)
 					}
 					rows.Close()
-					if err := rows.Err(); err != nil && shardErr == nil {
-						shardErr = fmt.Errorf("rows iteration error on query %d: %w", i, err)
+					if err := rows.Err(); err != nil && loopErr == nil {
+						loopErr = fmt.Errorf("rows iteration error on query %d: %w", i, err)
 					}
-					if shardErr != nil {
+					if loopErr != nil {
 						break
 					}
 				}
 
 				// Закрываем батч
-				if err := br.Close(); err != nil && shardErr == nil {
-					shardErr = fmt.Errorf("batch close: %w", err)
+				if err := br.Close(); err != nil && loopErr == nil {
+					loopErr = fmt.Errorf("batch close: %w", err)
 				}
 
-				if client.batchTx && shardErr == nil {
+				if client.batchTx && loopErr == nil {
 					if err := tx.Commit(ctx); err != nil {
-						shardErr = fmt.Errorf("commit: %w", err)
+						loopErr = fmt.Errorf("commit: %w", err)
 					}
 				}
 
-				if shardErr != nil {
-					return shardErr
-				}
-				return nil
+				return loopErr
 			})
 
 			if shardErr != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Errorf("shard %s: %w", shard, shardErr))
 				mu.Unlock()
+				return nil // не прерываем errgroup — другие шарды продолжают работу
 			}
-			return nil // не прерываем errgroup
+
+			// Успех: добавляем результаты шарда в общий слайс
+			mu.Lock()
+			result = append(result, shardResult...)
+			mu.Unlock()
+			return nil
 		})
 	}
 
 	_ = eg.Wait()
 
 	if len(errs) > 0 {
-		return errors.Join(errs...)
+		return nil, errors.Join(errs...)
 	}
-	return nil
+	return result, nil
 }

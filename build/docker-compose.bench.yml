@@ -1,0 +1,264 @@
+services:
+  # ===== Сценарий 1: 1 шард, sync=on =====
+  pg-shard-1:
+    image: postgres:17
+    container_name: pg-shard-1
+    environment:
+      POSTGRES_DB: ${PG_SHARD_1_DB_NAME}
+      POSTGRES_USER: ${PG_SHARD_1_USER}
+      POSTGRES_PASSWORD: ${PG_SHARD_1_PASSWORD}
+    ports:
+      - "5100:5432"
+    command: ["postgres", "-c", "synchronous_commit=on", "-c", "fsync=on", "-c", "track_wal_io_timing=on"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    restart: unless-stopped
+
+  # ===== Сценарий 2: 1 шард, sync=off =====
+  pg-shard-2:
+    image: postgres:17
+    container_name: pg-shard-2
+    environment:
+      POSTGRES_DB: ${PG_SHARD_1_DB_NAME}
+      POSTGRES_USER: ${PG_SHARD_1_USER}
+      POSTGRES_PASSWORD: ${PG_SHARD_1_PASSWORD}
+    ports:
+      - "5110:5432"
+    command: ["postgres", "-c", "synchronous_commit=off", "-c", "track_wal_io_timing=on"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    restart: unless-stopped
+
+  # ===== Сценарий 3: 2 шарда, sync=on =====
+  pg-shard-3:
+    image: postgres:17
+    container_name: pg-shard-3
+    environment:
+      POSTGRES_DB: ${PG_SHARD_1_DB_NAME}
+      POSTGRES_USER: ${PG_SHARD_1_USER}
+      POSTGRES_PASSWORD: ${PG_SHARD_1_PASSWORD}
+    ports:
+      - "5120:5432"
+    command: ["postgres",
+      "-c", "synchronous_commit=on",
+      "-c", "fsync=on",
+      "-c", "track_wal_io_timing=on",
+      "-c", "shared_preload_libraries=pg_stat_statements",
+      "-c", "pg_stat_statements.track=all"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    restart: unless-stopped
+
+  pg-shard-4:
+    image: postgres:17
+    container_name: pg-shard-4
+    environment:
+      POSTGRES_DB: ${PG_SHARD_2_DB_NAME}
+      POSTGRES_USER: ${PG_SHARD_2_USER}
+      POSTGRES_PASSWORD: ${PG_SHARD_2_PASSWORD}
+    ports:
+      - "5121:5432"
+    command: ["postgres",
+      "-c", "synchronous_commit=on",
+      "-c", "fsync=on",
+      "-c", "track_wal_io_timing=on",
+      "-c", "shared_preload_libraries=pg_stat_statements",
+      "-c", "pg_stat_statements.track=all"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    restart: unless-stopped
+
+  # ===== Сценарий 4: 2 шарда, sync=off =====
+  pg-shard-5:
+    image: postgres:17
+    container_name: pg-shard-5
+    environment:
+      POSTGRES_DB: ${PG_SHARD_1_DB_NAME}
+      POSTGRES_USER: ${PG_SHARD_1_USER}
+      POSTGRES_PASSWORD: ${PG_SHARD_1_PASSWORD}
+    ports:
+      - "5130:5432"
+    command: ["postgres", "-c", "synchronous_commit=off", "-c", "track_wal_io_timing=on"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    restart: unless-stopped
+
+  pg-shard-6:
+    image: postgres:17
+    container_name: pg-shard-6
+    environment:
+      POSTGRES_DB: ${PG_SHARD_2_DB_NAME}
+      POSTGRES_USER: ${PG_SHARD_2_USER}
+      POSTGRES_PASSWORD: ${PG_SHARD_2_PASSWORD}
+    ports:
+      - "5131:5432"
+    command: ["postgres", "-c", "synchronous_commit=off", "-c", "track_wal_io_timing=on"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    restart: unless-stopped
+
+  # =====================================================================
+  # ===== Мониторинг: postgres_exporter для каждого PG =====
+  # =====================================================================
+
+  exporter-pg1:
+    image: prometheuscommunity/postgres-exporter
+    container_name: exporter-pg1
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${PG_SHARD_1_USER}:${PG_SHARD_1_PASSWORD}@pg-shard-1:5432/${PG_SHARD_1_DB_NAME}?sslmode=disable"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "true"
+      PG_EXPORTER_EXTEND_QUERY_PATH: "/etc/postgres_exporter/queries.yml"
+      PG_EXPORTER_LOG_LEVEL: "debug"
+    volumes:
+      - ./postgres-queries.yml:/etc/postgres_exporter/queries.yml:ro
+    ports:
+      - "9181:9187"
+    depends_on:
+      pg-shard-1:
+        condition: service_healthy
+    restart: unless-stopped
+
+  exporter-pg2:
+    image: prometheuscommunity/postgres-exporter
+    container_name: exporter-pg2
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${PG_SHARD_1_USER}:${PG_SHARD_1_PASSWORD}@pg-shard-2:5432/${PG_SHARD_1_DB_NAME}?sslmode=disable"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "true"
+      PG_EXPORTER_EXTEND_QUERY_PATH: "/etc/postgres_exporter/queries.yml"
+    volumes:
+      - ./postgres-queries.yml:/etc/postgres_exporter/queries.yml:ro
+    ports:
+      - "9182:9187"
+    depends_on:
+      pg-shard-2:
+        condition: service_healthy
+    restart: unless-stopped
+
+  exporter-pg3:
+    image: prometheuscommunity/postgres-exporter
+    container_name: exporter-pg3
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${PG_SHARD_1_USER}:${PG_SHARD_1_PASSWORD}@pg-shard-3:5432/${PG_SHARD_1_DB_NAME}?sslmode=disable"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "true"
+      PG_EXPORTER_EXTEND_QUERY_PATH: "/etc/postgres_exporter/queries.yml"
+    volumes:
+      - ./postgres-queries.yml:/etc/postgres_exporter/queries.yml:ro
+    ports:
+      - "9183:9187"
+    depends_on:
+      pg-shard-3:
+        condition: service_healthy
+    restart: unless-stopped
+
+  exporter-pg4:
+    image: prometheuscommunity/postgres-exporter
+    container_name: exporter-pg4
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${PG_SHARD_2_USER}:${PG_SHARD_2_PASSWORD}@pg-shard-4:5432/${PG_SHARD_2_DB_NAME}?sslmode=disable"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "true"
+      PG_EXPORTER_EXTEND_QUERY_PATH: "/etc/postgres_exporter/queries.yml"
+    volumes:
+      - ./postgres-queries.yml:/etc/postgres_exporter/queries.yml:ro
+    ports:
+      - "9184:9187"
+    depends_on:
+      pg-shard-4:
+        condition: service_healthy
+    restart: unless-stopped
+
+  exporter-pg5:
+    image: prometheuscommunity/postgres-exporter
+    container_name: exporter-pg5
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${PG_SHARD_1_USER}:${PG_SHARD_1_PASSWORD}@pg-shard-5:5432/${PG_SHARD_1_DB_NAME}?sslmode=disable"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "true"
+      PG_EXPORTER_EXTEND_QUERY_PATH: "/etc/postgres_exporter/queries.yml"
+    volumes:
+      - ./postgres-queries.yml:/etc/postgres_exporter/queries.yml:ro
+    ports:
+      - "9185:9187"
+    depends_on:
+      pg-shard-5:
+        condition: service_healthy
+    restart: unless-stopped
+
+  exporter-pg6:
+    image: prometheuscommunity/postgres-exporter
+    container_name: exporter-pg6
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${PG_SHARD_2_USER}:${PG_SHARD_2_PASSWORD}@pg-shard-6:5432/${PG_SHARD_2_DB_NAME}?sslmode=disable"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "true"
+      PG_EXPORTER_EXTEND_QUERY_PATH: "/etc/postgres_exporter/queries.yml"
+    volumes:
+      - ./postgres-queries.yml:/etc/postgres_exporter/queries.yml:ro
+    ports:
+      - "9186:9187"
+    depends_on:
+      pg-shard-6:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # =====================================================================
+  # ===== Prometheus =====
+  # =====================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+      - "--web.enable-lifecycle"
+    depends_on:
+      - exporter-pg1
+      - exporter-pg2
+      - exporter-pg3
+      - exporter-pg4
+      - exporter-pg5
+      - exporter-pg6
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/prometheus.yml:ro
+      - ./grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./dashboards:/etc/grafana/provisioning/dashboards/json:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:

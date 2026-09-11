@@ -83,11 +83,11 @@ func TestClientOptions(t *testing.T) {
 	t.Run("WithMaxParallelQueries sets concurrency", func(t *testing.T) {
 		t.Parallel()
 		c := &Client{}
-		WithMaxParallelQueries(8)(c)
+		WithConcurrency(8)(c)
 		require.Equal(t, 8, c.concurrency)
 
 		// отрицательное значение игнорируется
-		WithMaxParallelQueries(-1)(c)
+		WithConcurrency(-1)(c)
 		require.Equal(t, 8, c.concurrency)
 	})
 

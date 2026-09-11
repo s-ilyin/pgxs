@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -65,7 +66,7 @@ func setupTestClient(t *testing.T) setupTest {
 	}
 
 	client, err := pgxs.New(t.Context(), cfg,
-		pgxs.WithMaxParallelQueries(4),
+		pgxs.WithConcurrency(4),
 		pgxs.WithBatchTx(true),
 	)
 	require.NoError(t, err)
@@ -144,11 +145,10 @@ func TestClient_Exec(t *testing.T) {
 		require.NoError(t, err)
 
 		// 2. Вычисляем bucketID ТОЧНО ТАК ЖЕ, как это делает клиент
-		// Клиент внутри вызывает HashKey с теми же аргументами
 		bucketID := pgxs.BucketID(pgxs.HashKey(want.ID.PreHash(), 4))
 
 		// 3. Проверяем через прямой пул
-		p := setup.buckets[bucketID] // ← берём пул для этого бакета
+		p := setup.buckets[bucketID]
 		got := testUser{}
 		q := fmt.Sprintf("SELECT id, name, age FROM bucket_%d.users WHERE id = $1", bucketID)
 		err = p.QueryRow(t.Context(), q, want.ID).
@@ -265,6 +265,215 @@ func Test_Exec(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Equal(t, 3, total)
+	})
+}
+
+// Test_Query_NoRetriesForInvalidSQL проверяет, что при неповторяемой ошибке
+// (например, синтаксической ошибке SQLSTATE 42601) ретраев НЕ происходит,
+// даже если MaxAttempts > 1. Проверяется как с транзакцией, так и без неё.
+func Test_Query_NoRetriesForInvalidSQL(t *testing.T) {
+	dsn1 := os.Getenv("PG_SHARD_1_DSN")
+	dsn2 := os.Getenv("PG_SHARD_2_DSN")
+
+	// Проверяем оба режима: с транзакцией и без.
+	for _, batchTx := range []bool{true, false} {
+		name := "with_tx"
+		if !batchTx {
+			name = "without_tx"
+		}
+		t.Run(name, func(t *testing.T) {
+			cfg := &pgxs.Config{
+				Buckets:      4,
+				SchemaPrefix: "bucket_",
+				Shards: []pgxs.Shard{
+					{Name: "shard_1", DSN: dsn1},
+					{Name: "shard_2", DSN: dsn2},
+				},
+				Mapping: []pgxs.MappingEntry{
+					{Bucket: 0, Shard: "shard_1"},
+					{Bucket: 1, Shard: "shard_1"},
+					{Bucket: 2, Shard: "shard_2"},
+					{Bucket: 3, Shard: "shard_2"},
+				},
+				// Явно разрешаем 3 попытки — если ретраи ошибочно сработают,
+				// счётчик queryCalls будет больше len(users).
+				Retry: pgxs.RetryConfig{
+					MaxAttempts: 3,
+					BaseDelay:   10 * time.Millisecond,
+					MaxDelay:    50 * time.Millisecond,
+				},
+			}
+
+			client, err := pgxs.New(t.Context(), cfg,
+				pgxs.WithBatchTx(batchTx),
+			)
+			require.NoError(t, err)
+			defer client.Close()
+
+			// Счётчик вызовов callback'а query (по одному на элемент за попытку).
+			var queryCalls int
+
+			users := []testUser{
+				{ID: KeyShardID("bad1")},
+				{ID: KeyShardID("bad2")},
+				{ID: KeyShardID("bad3")},
+			}
+
+			_, err = pgxs.Query(t.Context(), client, users,
+				func(u testUser) []byte { return u.ID.PreHash() },
+				func(u testUser) (string, []any) {
+					queryCalls++
+					// Заведомо невалидный SQL → SQLSTATE 42601 (syntax_error),
+					// который НЕ входит в список retryable.
+					return `THIS IS INVALID SQL SYNTAX !!!`, nil
+				},
+				func(rows pgx.Rows) (string, error) {
+					var id string
+					errScan := rows.Scan(&id)
+					return id, errScan
+				},
+			)
+
+			// Ошибка должна вернуться (валидный парсинг SQL не пройдёт).
+			require.Error(t, err)
+
+			// Ключевая проверка: queryCalls должен равняться числу элементов
+			// (по одному вызову на элемент за ЕДИНСТВЕННУЮ попытку).
+			// Если бы ретраи сработали, queryCalls был бы кратен len(users).
+			require.Equal(t, len(users), queryCalls,
+				"non-retryable syntax error must not trigger retries")
+		})
+	}
+}
+
+// Test_Query проверяет массовую функцию Query.
+func Test_Query(t *testing.T) {
+	setup := setupTestClient(t)
+	t.Cleanup(func() { setupTestClose(setup) })
+
+	t.Run("Query insert returning", func(t *testing.T) {
+		defer cleanupTestData(t, setup)
+
+		users := []testUser{
+			{ID: KeyShardID("q1"), Name: "Query1", Age: 11},
+			{ID: KeyShardID("q2"), Name: "Query2", Age: 22},
+			{ID: KeyShardID("q3"), Name: "Query3", Age: 33},
+		}
+
+		ids, err := pgxs.Query(t.Context(), setup.client, users,
+			func(u testUser) []byte { return u.ID.PreHash() },
+			func(u testUser) (string, []any) {
+				return `INSERT INTO {schema}.users (id, name, age) VALUES ($1, $2, $3) RETURNING id`,
+					[]any{u.ID, u.Name, u.Age}
+			},
+			func(rows pgx.Rows) (string, error) {
+				var id string
+				err := rows.Scan(&id)
+				return id, err
+			},
+		)
+		require.NoError(t, err)
+		require.Len(t, ids, 3)
+		require.ElementsMatch(t, []string{"q1", "q2", "q3"}, ids)
+
+		// Проверяем, что данные действительно вставились
+		var total int
+		for b, p := range setup.buckets {
+			var count int
+			query := fmt.Sprintf("SELECT COUNT(*) FROM bucket_%d.users WHERE id IN ($1, $2, $3)", b)
+			err = p.QueryRow(t.Context(), query, "q1", "q2", "q3").Scan(&count)
+			require.NoError(t, err)
+			total += count
+		}
+		require.Equal(t, 3, total)
+	})
+
+	t.Run("Query select multiple rows", func(t *testing.T) {
+		defer cleanupTestData(t, setup)
+
+		// Вставляем данные в бакеты, которые вычисляются по хешу —
+		// именно туда пойдут запросы Query для этих же ID.
+		type insertCase struct {
+			id   string
+			name string
+			age  int
+		}
+		cases := []insertCase{
+			{id: "s1", name: "Sel1", age: 100},
+			{id: "s2", name: "Sel2", age: 200},
+			{id: "s3", name: "Sel3", age: 300},
+			{id: "s4", name: "Sel4", age: 400},
+		}
+		for _, c := range cases {
+			bucketID := pgxs.BucketID(pgxs.HashKey([]byte(c.id), 4))
+			insertTestData(t, setup, testUserWithBucketID{
+				bucketID: bucketID,
+				value:    testUser{ID: KeyShardID(c.id), Name: c.name, Age: c.age},
+			})
+		}
+
+		users := []testUser{
+			{ID: "s1"},
+			{ID: "s2"},
+			{ID: "s3"},
+			{ID: "s4"},
+		}
+
+		names, err := pgxs.Query(t.Context(), setup.client, users,
+			func(u testUser) []byte { return u.ID.PreHash() },
+			func(u testUser) (string, []any) {
+				return `SELECT name FROM {schema}.users WHERE id = $1`, []any{u.ID}
+			},
+			func(rows pgx.Rows) (string, error) {
+				var name string
+				err := rows.Scan(&name)
+				return name, err
+			},
+		)
+		require.NoError(t, err)
+		require.Len(t, names, 4)
+		require.ElementsMatch(t, []string{"Sel1", "Sel2", "Sel3", "Sel4"}, names)
+	})
+
+	t.Run("Query update returning", func(t *testing.T) {
+		defer cleanupTestData(t, setup)
+
+		type insertCase struct {
+			id   string
+			name string
+			age  int
+		}
+		cases := []insertCase{
+			{id: "u1", name: "Upd1", age: 10},
+			{id: "u2", name: "Upd2", age: 20},
+		}
+		for _, c := range cases {
+			bucketID := pgxs.BucketID(pgxs.HashKey([]byte(c.id), 4))
+			insertTestData(t, setup, testUserWithBucketID{
+				bucketID: bucketID,
+				value:    testUser{ID: KeyShardID(c.id), Name: c.name, Age: c.age},
+			})
+		}
+
+		users := []testUser{
+			{ID: "u1"},
+			{ID: "u2"},
+		}
+
+		ids, err := pgxs.Query(t.Context(), setup.client, users,
+			func(u testUser) []byte { return u.ID.PreHash() },
+			func(u testUser) (string, []any) {
+				return `UPDATE {schema}.users SET age = age + 1 WHERE id = $1 RETURNING id`, []any{u.ID}
+			},
+			func(rows pgx.Rows) (string, error) {
+				var id string
+				err := rows.Scan(&id)
+				return id, err
+			},
+		)
+		require.NoError(t, err)
+		require.Len(t, ids, 2)
+		require.ElementsMatch(t, []string{"u1", "u2"}, ids)
 	})
 }
 
@@ -435,83 +644,23 @@ func TestClient_ForEachRow(t *testing.T) {
 		t,
 		setup,
 		[]testUserWithBucketID{
-			{
-				bucketID: 0,
-				value: testUser{
-					ID:   KeyShardID("1"),
-					Name: "1",
-					Age:  10,
-				},
-			},
-			{
-				bucketID: 0,
-				value: testUser{
-					ID:   KeyShardID("2"),
-					Name: "2",
-					Age:  20,
-				},
-			},
-			{
-				bucketID: 1,
-				value: testUser{
-					ID:   KeyShardID("3"),
-					Name: "3",
-					Age:  30,
-				},
-			},
-			{
-				bucketID: 1,
-				value: testUser{
-					ID:   KeyShardID("4"),
-					Name: "4",
-					Age:  40,
-				},
-			},
-			{
-				bucketID: 2,
-				value: testUser{
-					ID:   KeyShardID("5"),
-					Name: "5",
-					Age:  50,
-				},
-			},
-			{
-				bucketID: 2,
-				value: testUser{
-					ID:   KeyShardID("6"),
-					Name: "6",
-					Age:  60,
-				},
-			},
-			{
-				bucketID: 3,
-				value: testUser{
-					ID:   KeyShardID("7"),
-					Name: "7",
-					Age:  70,
-				},
-			},
-			{
-				bucketID: 3,
-				value: testUser{
-					ID:   KeyShardID("8"),
-					Name: "8",
-					Age:  80,
-				},
-			},
+			{bucketID: 0, value: testUser{ID: "1", Name: "1", Age: 10}},
+			{bucketID: 0, value: testUser{ID: "2", Name: "2", Age: 20}},
+			{bucketID: 1, value: testUser{ID: "3", Name: "3", Age: 30}},
+			{bucketID: 1, value: testUser{ID: "4", Name: "4", Age: 40}},
+			{bucketID: 2, value: testUser{ID: "5", Name: "5", Age: 50}},
+			{bucketID: 2, value: testUser{ID: "6", Name: "6", Age: 60}},
+			{bucketID: 3, value: testUser{ID: "7", Name: "7", Age: 70}},
+			{bucketID: 3, value: testUser{ID: "8", Name: "8", Age: 80}},
 		}...,
 	)
 
 	t.Run("ForEachRow all rows", func(t *testing.T) {
-		var ids []string
-		err := setup.client.ForEachRow(t.Context(),
-			func(rows pgx.Rows) error {
+		ids, err := pgxs.ForEachRow(t.Context(), setup.client,
+			func(rows pgx.Rows) (string, error) {
 				var id string
-				if err := rows.Scan(&id); err != nil {
-					return err
-				}
-				ids = append(ids, id)
-				return nil
+				err := rows.Scan(&id)
+				return id, err
 			},
 			`SELECT id FROM {schema}.users ORDER BY id`,
 		)
@@ -522,15 +671,11 @@ func TestClient_ForEachRow(t *testing.T) {
 	})
 
 	t.Run("ForEachRow with filter", func(t *testing.T) {
-		var names []string
-		err := setup.client.ForEachRow(t.Context(),
-			func(rows pgx.Rows) error {
+		names, err := pgxs.ForEachRow(t.Context(), setup.client,
+			func(rows pgx.Rows) (string, error) {
 				var name string
-				if err := rows.Scan(&name); err != nil {
-					return err
-				}
-				names = append(names, name)
-				return nil
+				err := rows.Scan(&name)
+				return name, err
 			},
 			`SELECT name FROM {schema}.users WHERE age > 30 ORDER BY name`,
 		)
@@ -541,16 +686,16 @@ func TestClient_ForEachRow(t *testing.T) {
 	})
 
 	t.Run("ForEachRow with error in handler", func(t *testing.T) {
-		err := setup.client.ForEachRow(t.Context(),
-			func(rows pgx.Rows) error {
+		_, err := pgxs.ForEachRow(t.Context(), setup.client,
+			func(rows pgx.Rows) (string, error) {
 				var id string
 				if err := rows.Scan(&id); err != nil {
-					return err
+					return "", err
 				}
 				if id == "3" {
-					return ErrTestError
+					return "", ErrTestError
 				}
-				return nil
+				return id, nil
 			},
 			`SELECT id FROM {schema}.users ORDER BY id`,
 		)

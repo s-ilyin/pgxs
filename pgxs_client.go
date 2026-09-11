@@ -2,6 +2,8 @@ package pgxs
 
 import (
 	"context"
+	"fmt"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -43,13 +45,14 @@ type Client struct {
 	poolOpts       []PoolOption
 	concurrency    int
 	batchTx        bool
+	schemaNames    []string
 }
 
 // ClientOption – функциональная опция для клиента.
 type ClientOption func(*Client)
 
 // WithMaxParallelQueries устанавливает максимальное число одновременных запросов при параллельным запросах.
-func WithMaxParallelQueries(n int) ClientOption {
+func WithConcurrency(n int) ClientOption {
 	return func(c *Client) {
 		if n > 0 {
 			c.concurrency = n
@@ -78,6 +81,15 @@ func WithPoolOptions(opts ...PoolOption) ClientOption {
 	}
 }
 
+func DefaultConcurrency(shards int) int {
+	gmp := runtime.GOMAXPROCS(0) // учитывает cgroup limits
+	want := min(max(gmp*2, 4), 8)
+	if shards < want {
+		return shards
+	}
+	return want
+}
+
 // NewClient создаёт новый клиент с заданным конфигом и опциями.
 func New(ctx context.Context, cfg *Config, opts ...ClientOption) (*Client, error) {
 	if err := cfg.Validate(); err != nil {
@@ -97,7 +109,7 @@ func New(ctx context.Context, cfg *Config, opts ...ClientOption) (*Client, error
 	c := &Client{
 		config:      cfg,
 		mapping:     mapping,
-		concurrency: 4,
+		concurrency: DefaultConcurrency(len(cfg.Shards)),
 		batchTx:     true,
 		poolOpts:    []PoolOption{},
 	}
@@ -109,6 +121,11 @@ func New(ctx context.Context, cfg *Config, opts ...ClientOption) (*Client, error
 		return nil, err
 	}
 	c.wrapPool = wrapPool
+
+	c.schemaNames = make([]string, cfg.Buckets)
+	for i := range int(cfg.Buckets) {
+		c.schemaNames[i] = cfg.SchemaPrefix + strconv.Itoa(i)
+	}
 
 	return c, nil
 }
@@ -125,8 +142,10 @@ func (c *Client) resolve(bucketID BucketID) (shardName, schemaName string, err e
 	if err != nil {
 		return "", "", err
 	}
-	schema := c.config.SchemaPrefix + strconv.Itoa(int(bucketID))
-	return shard, schema, nil
+	if int(bucketID) >= len(c.schemaNames) {
+		return "", "", fmt.Errorf("bucket %d out of schema cache range", bucketID)
+	}
+	return shard, c.schemaNames[bucketID], nil
 }
 
 func (c *Client) replaceSchema(sql, schema string) string {

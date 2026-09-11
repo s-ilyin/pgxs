@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestClient_ForEachRow(t *testing.T) {
+func TestForEachRow(t *testing.T) {
 	t.Parallel()
 
 	t.Run("success with multiple shards and buckets", func(t *testing.T) {
@@ -106,22 +106,17 @@ func TestClient_ForEachRow(t *testing.T) {
 			Release().
 			Return().Times(2)
 
-		var scannedIDs []string
-		err := cm.ForEachRow(
-			context.Background(),
-			func(rows pgx.Rows) error {
+		results, err := ForEachRow(t.Context(), cm.Client,
+			func(rows pgx.Rows) (string, error) {
 				var id string
-				if err := rows.Scan(&id); err != nil {
-					return err
-				}
-				scannedIDs = append(scannedIDs, id)
-				return nil
+				err := rows.Scan(&id)
+				return id, err
 			},
 			`SELECT id FROM {schema}.users WHERE name = $1`,
 			"Alice",
 		)
 		require.NoError(t, err)
-		require.Len(t, scannedIDs, 4)
+		require.Len(t, results, 4)
 	})
 
 	t.Run("error mapping fails", func(t *testing.T) {
@@ -132,9 +127,12 @@ func TestClient_ForEachRow(t *testing.T) {
 			GetShard(BucketID(0)).
 			Return(mock.Anything, assert.AnError)
 
-		err := cm.ForEachRow(
-			context.Background(),
-			func(rows pgx.Rows) error { return nil },
+		_, err := ForEachRow(t.Context(), cm.Client,
+			func(rows pgx.Rows) (string, error) {
+				var id string
+				err := rows.Scan(&id)
+				return id, err
+			},
 			`SELECT id FROM {schema}.users`,
 		)
 		require.Error(t, err)
@@ -147,19 +145,21 @@ func TestClient_ForEachRow(t *testing.T) {
 
 		// Ожидаем mapping для всех бакетов (происходит до горутин)
 		for b := range 4 {
-			shard := "shard_1"
 			cm.mappingMock.EXPECT().
 				GetShard(BucketID(b)).
-				Return(shard, nil)
+				Return("shard_1", nil)
 		}
 
 		cm.wrapPoolMock.EXPECT().
 			GetPool("shard_1").
 			Return(nil, assert.AnError)
 
-		err := cm.ForEachRow(
-			context.Background(),
-			func(rows pgx.Rows) error { return nil },
+		_, err := ForEachRow(t.Context(), cm.Client,
+			func(rows pgx.Rows) (string, error) {
+				var id string
+				err := rows.Scan(&id)
+				return id, err
+			},
 			`SELECT id FROM {schema}.users`,
 		)
 		require.Error(t, err)
@@ -171,10 +171,9 @@ func TestClient_ForEachRow(t *testing.T) {
 		cm := clientMocks(t)
 
 		for b := range 4 {
-			shard := "shard_1"
 			cm.mappingMock.EXPECT().
 				GetShard(BucketID(b)).
-				Return(shard, nil)
+				Return("shard_1", nil)
 		}
 
 		cm.wrapPoolMock.EXPECT().
@@ -185,9 +184,12 @@ func TestClient_ForEachRow(t *testing.T) {
 			Acquire(mock.Anything).
 			Return(nil, assert.AnError)
 
-		err := cm.ForEachRow(
-			context.Background(),
-			func(rows pgx.Rows) error { return nil },
+		_, err := ForEachRow(t.Context(), cm.Client,
+			func(rows pgx.Rows) (string, error) {
+				var id string
+				err := rows.Scan(&id)
+				return id, err
+			},
 			`SELECT id FROM {schema}.users`,
 		)
 		require.Error(t, err)
@@ -227,9 +229,12 @@ func TestClient_ForEachRow(t *testing.T) {
 			Release().
 			Return()
 
-		err := cm.ForEachRow(
-			context.Background(),
-			func(rows pgx.Rows) error { return nil },
+		_, err := ForEachRow(t.Context(), cm.Client,
+			func(rows pgx.Rows) (string, error) {
+				var id string
+				err := rows.Scan(&id)
+				return id, err
+			},
 			`SELECT id FROM {schema}.users`,
 		)
 		require.Error(t, err)
@@ -264,8 +269,8 @@ func TestClient_ForEachRow(t *testing.T) {
 			Next().
 			Return(true).Once()
 
-		cm.pgxRowsMock.EXPECT().
-			Scan(mock.Anything).Return(assert.AnError).Once()
+		// Scan вызывается внутри scanRows пользователя (rows.Scan), но наш callback
+		// вернёт ошибку до вызова Scan. Поэтому Scan не ожидается.
 
 		cm.pgxRowsMock.EXPECT().
 			Close().Return().Once()
@@ -278,11 +283,9 @@ func TestClient_ForEachRow(t *testing.T) {
 			Release().
 			Return()
 
-		err := cm.ForEachRow(
-			context.Background(),
-			func(rows pgx.Rows) error {
-				var id string
-				return rows.Scan(&id)
+		_, err := ForEachRow(t.Context(), cm.Client,
+			func(rows pgx.Rows) (string, error) {
+				return "", assert.AnError
 			},
 			`SELECT id FROM {schema}.users`,
 		)
@@ -327,9 +330,12 @@ func TestClient_ForEachRow(t *testing.T) {
 			Release().
 			Return()
 
-		err := cm.ForEachRow(
-			context.Background(),
-			func(rows pgx.Rows) error { return nil },
+		_, err := ForEachRow(t.Context(), cm.Client,
+			func(rows pgx.Rows) (string, error) {
+				var id string
+				err := rows.Scan(&id)
+				return id, err
+			},
 			`SELECT id FROM {schema}.users`,
 		)
 		require.Error(t, err)
@@ -339,7 +345,7 @@ func TestClient_ForEachRow(t *testing.T) {
 	t.Run("context cancelled", func(t *testing.T) {
 		t.Parallel()
 		cm := clientMocks(t)
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
 
 		for b := range 4 {
@@ -348,9 +354,15 @@ func TestClient_ForEachRow(t *testing.T) {
 				Return("shard_1", nil)
 		}
 
-		err := cm.ForEachRow(
-			ctx,
-			func(rows pgx.Rows) error { return nil },
+		// При отменённом контексте withRetryErr не выполняет fn,
+		// поэтому GetPool и Acquire не вызываются
+
+		_, err := ForEachRow(ctx, cm.Client,
+			func(rows pgx.Rows) (string, error) {
+				var id string
+				err := rows.Scan(&id)
+				return id, err
+			},
 			`SELECT id FROM {schema}.users`,
 		)
 		require.Error(t, err)

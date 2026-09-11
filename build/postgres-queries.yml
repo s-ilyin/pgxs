@@ -1,0 +1,67 @@
+pg_stat_wal:
+  query: |
+    SELECT
+      wal_records,
+      wal_fpi,
+      wal_bytes,
+      wal_buffers_full,
+      wal_write,
+      wal_sync,
+      wal_write_time,
+      wal_sync_time
+    FROM pg_stat_wal
+  master: true
+  cache_seconds: 0
+  metrics:
+    - wal_records:
+        usage: "COUNTER"
+        description: "Общее число сгенерированных записей WAL"
+    - wal_fpi:
+        usage: "COUNTER"
+        description: "Общее число полноразмерных образов страниц (FPI) в WAL"
+    - wal_bytes:
+        usage: "COUNTER"
+        description: "Общий объём сгенерированного WAL в байтах"
+    - wal_buffers_full:
+        usage: "COUNTER"
+        description: "Сколько раз данные WAL сбрасывались на диск из-за переполнения буферов WAL"
+    - wal_write:
+        usage: "COUNTER"
+        description: "Сколько раз буферы WAL записывались на диск через XLogWrite"
+    - wal_sync:
+        usage: "COUNTER"
+        description: "Сколько раз файлы WAL синхронизировались через pg_fsync"
+    - wal_write_time:
+        usage: "COUNTER"
+        description: "Время, потраченное на запись буферов WAL на диск (мс)"
+    - wal_sync_time:
+        usage: "COUNTER"
+        description: "Время, потраченное на синхронизацию файлов WAL на диск (мс)"
+
+pg_stat_checkpointer:
+  query: |
+    SELECT
+      num_timed,
+      num_requested,
+      write_time,
+      sync_time,
+      buffers_written
+    FROM pg_stat_checkpointer
+  master: true
+  cache_seconds: 0
+  metrics:
+    - num_timed:
+        usage: "COUNTER"
+        description: "Число плановых контрольных точек по таймауту"
+    - num_requested:
+        usage: "COUNTER"
+        description: "Число контрольных точек, запрошенных вручную или принудительно"
+    - write_time:
+        usage: "COUNTER"
+        description: "Время, потраченное на запись файлов во время контрольных точек (мс)"
+    - sync_time:
+        usage: "COUNTER"
+        description: "Время, потраченное на синхронизацию файлов во время контрольных точек (мс)"
+    - buffers_written:
+        usage: "COUNTER"
+        description: "Число буферов, записанных во время контрольных точек"
