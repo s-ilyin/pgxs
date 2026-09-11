@@ -1,6 +1,7 @@
 package pgxs
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -47,6 +48,10 @@ func clientMocks(t *testing.T) *clientMock {
 			SchemaPrefix: "bucket_",
 		},
 		concurrency: 2, // по умолчанию для тестов ставим 2
+		schemaNames: make([]string, 100),
+	}
+	for i := range int(client.config.Buckets) {
+		client.schemaNames[i] = client.config.SchemaPrefix + strconv.Itoa(i)
 	}
 
 	return &clientMock{
