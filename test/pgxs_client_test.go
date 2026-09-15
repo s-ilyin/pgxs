@@ -139,7 +139,7 @@ func TestClient_Exec(t *testing.T) {
 		}
 
 		// 1. Вставляем через клиент
-		_, err := setup.client.Exec(t.Context(), want.ID,
+		_, err := setup.client.ExecPresher(t.Context(), want.ID,
 			`INSERT INTO {schema}.users (id, name, age) VALUES ($1, $2, $3)`,
 			want.ID, want.Name, want.Age)
 		require.NoError(t, err)
@@ -199,7 +199,7 @@ func TestClient_Query(t *testing.T) {
 
 		got := testUser{}
 
-		err := setup.client.QueryRow(t.Context(), want.ID,
+		err := setup.client.QueryRowPresher(t.Context(), want.ID,
 			`SELECT id, name, age FROM {schema}.users WHERE id = $1`,
 			want.ID).Scan(&got.ID, &got.Name, &got.Age)
 		require.NoError(t, err)
@@ -710,7 +710,7 @@ func TestClient_ErrorHandling(t *testing.T) {
 	t.Run("QueryRow on non-existent key", func(t *testing.T) {
 		id := KeyShardID("unknown")
 		var name string
-		err := setup.client.QueryRow(t.Context(), id,
+		err := setup.client.QueryRowPresher(t.Context(), id,
 			`SELECT name FROM {schema}.users WHERE id = $1`,
 			id).Scan(&name)
 		require.Error(t, err)

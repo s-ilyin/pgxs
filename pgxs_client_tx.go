@@ -6,17 +6,35 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func (c *Client) BeginTx(ctx context.Context, key PreHasher, txOptions pgx.TxOptions) (Tx, error) {
+func (c *Client) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error) {
+	bucketID, err := c.bucketFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.BeginTxBucket(ctx, bucketID, txOptions)
+}
+
+func (c *Client) Begin(ctx context.Context) (pgx.Tx, error) {
+	bucketID, err := c.bucketFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.BeginBucket(ctx, bucketID)
+}
+
+func (c *Client) BeginTxPreHasher(ctx context.Context, key PreHasher, txOptions pgx.TxOptions) (pgx.Tx, error) {
 	bucketID := BucketID(HashKey(key.PreHash(), c.config.Buckets))
 	return c.BeginTxBucket(ctx, bucketID, txOptions)
 }
 
-func (c *Client) Begin(ctx context.Context, key PreHasher) (Tx, error) {
+func (c *Client) BeginPreHasher(ctx context.Context, key PreHasher) (pgx.Tx, error) {
 	bucketID := BucketID(HashKey(key.PreHash(), c.config.Buckets))
 	return c.BeginBucket(ctx, bucketID)
 }
 
-func (c *Client) BeginBucket(ctx context.Context, bucketID BucketID) (Tx, error) {
+func (c *Client) BeginBucket(ctx context.Context, bucketID BucketID) (pgx.Tx, error) {
 	pool, schema, err := c.getPoolByBucket(bucketID)
 	if err != nil {
 		return nil, err
@@ -28,7 +46,7 @@ func (c *Client) BeginBucket(ctx context.Context, bucketID BucketID) (Tx, error)
 	return &wrapTx{tx: tx, schema: schema, client: c}, nil
 }
 
-func (c *Client) BeginTxBucket(ctx context.Context, bucketID BucketID, txOptions pgx.TxOptions) (Tx, error) {
+func (c *Client) BeginTxBucket(ctx context.Context, bucketID BucketID, txOptions pgx.TxOptions) (pgx.Tx, error) {
 	pool, schema, err := c.getPoolByBucket(bucketID)
 	if err != nil {
 		return nil, err

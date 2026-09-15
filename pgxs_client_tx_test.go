@@ -108,7 +108,7 @@ func TestClient_Begin(t *testing.T) {
 			Begin(mock.Anything).
 			Return(cm.pgxTxMock, nil)
 
-		tx, err := cm.Begin(t.Context(), key)
+		tx, err := cm.BeginPreHasher(t.Context(), key)
 		require.NoError(t, err)
 		require.NotNil(t, tx)
 
@@ -130,7 +130,7 @@ func TestClient_Begin(t *testing.T) {
 			GetPool(mock.Anything).
 			Return(nil, assert.AnError)
 
-		_, err := cm.Begin(t.Context(), key)
+		_, err := cm.BeginPreHasher(t.Context(), key)
 		require.Error(t, err)
 		require.ErrorIs(t, err, assert.AnError)
 	})
@@ -145,7 +145,7 @@ func TestClient_Begin(t *testing.T) {
 			GetShard(bucketID).
 			Return(mock.Anything, assert.AnError)
 
-		_, err := cm.Begin(t.Context(), key)
+		_, err := cm.BeginPreHasher(t.Context(), key)
 		require.Error(t, err)
 		require.ErrorIs(t, err, assert.AnError)
 	})
@@ -166,7 +166,7 @@ func TestClient_Begin(t *testing.T) {
 			Begin(mock.Anything).
 			Return(nil, assert.AnError)
 
-		_, err := cm.Begin(t.Context(), key)
+		_, err := cm.BeginPreHasher(t.Context(), key)
 		require.Error(t, err)
 		require.ErrorIs(t, err, assert.AnError)
 	})

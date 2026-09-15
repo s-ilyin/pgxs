@@ -255,7 +255,7 @@ func TestClient_Exec(t *testing.T) {
 			Exec(mock.Anything, `INSERT INTO bucket_2.users (name) VALUES ($1)`, mock.Anything).
 			Return(pgconn.NewCommandTag("INSERT 1"), nil)
 
-		tag, err := cm.Exec(t.Context(), key, `INSERT INTO {schema}.users (name) VALUES ($1)`, "Alice")
+		tag, err := cm.ExecPresher(t.Context(), key, `INSERT INTO {schema}.users (name) VALUES ($1)`, "Alice")
 		require.NoError(t, err)
 		require.Equal(t, "INSERT 1", tag.String())
 	})
@@ -273,7 +273,7 @@ func TestClient_Exec(t *testing.T) {
 			GetPool(mock.Anything).
 			Return(nil, assert.AnError)
 
-		_, err := cm.Exec(t.Context(), key, `INSERT INTO {schema}.users (name) VALUES ($1)`, "Alice")
+		_, err := cm.ExecPresher(t.Context(), key, `INSERT INTO {schema}.users (name) VALUES ($1)`, "Alice")
 		require.Error(t, err)
 		require.ErrorIs(t, err, assert.AnError)
 	})
@@ -288,7 +288,7 @@ func TestClient_Exec(t *testing.T) {
 			GetShard(mock.Anything).
 			Return("", assert.AnError)
 
-		_, err := cm.Exec(t.Context(), key, `INSERT INTO {schema}.users (name) VALUES ($1)`, "Alice")
+		_, err := cm.ExecPresher(t.Context(), key, `INSERT INTO {schema}.users (name) VALUES ($1)`, "Alice")
 		require.Error(t, err)
 		require.ErrorIs(t, err, assert.AnError)
 	})
@@ -311,7 +311,7 @@ func TestClient_Exec(t *testing.T) {
 			Exec(mock.Anything, `INSERT INTO bucket_2.users (name) VALUES ($1)`, mock.Anything).
 			Return(pgconn.CommandTag{}, assert.AnError)
 
-		_, err := cm.Exec(t.Context(), key, `INSERT INTO {schema}.users (name) VALUES ($1)`, "Alice")
+		_, err := cm.ExecPresher(t.Context(), key, `INSERT INTO {schema}.users (name) VALUES ($1)`, "Alice")
 		require.Error(t, err)
 		require.ErrorIs(t, err, assert.AnError)
 	})
@@ -336,7 +336,7 @@ func TestClient_Query(t *testing.T) {
 			Query(mock.Anything, `SELECT id FROM bucket_2.users WHERE name = $1`, mock.Anything).
 			Return(mockRows, nil)
 
-		rows, err := cm.Query(t.Context(), key, `SELECT id FROM {schema}.users WHERE name = $1`, "Alice")
+		rows, err := cm.QueryPresher(t.Context(), key, `SELECT id FROM {schema}.users WHERE name = $1`, "Alice")
 		require.NoError(t, err)
 		require.NotNil(t, rows)
 	})
@@ -354,7 +354,7 @@ func TestClient_Query(t *testing.T) {
 			GetPool(mock.Anything).
 			Return(nil, assert.AnError)
 
-		_, err := cm.Query(t.Context(), key, `SELECT id FROM {schema}.users WHERE name = $1`, "Alice")
+		_, err := cm.QueryPresher(t.Context(), key, `SELECT id FROM {schema}.users WHERE name = $1`, "Alice")
 		require.Error(t, err)
 		require.ErrorIs(t, err, assert.AnError)
 	})
@@ -369,7 +369,7 @@ func TestClient_Query(t *testing.T) {
 			GetShard(mock.Anything).
 			Return("", assert.AnError)
 
-		_, err := cm.Query(t.Context(), key, `SELECT id FROM {schema}.users WHERE name = $1`, "Alice")
+		_, err := cm.QueryPresher(t.Context(), key, `SELECT id FROM {schema}.users WHERE name = $1`, "Alice")
 		require.Error(t, err)
 		require.ErrorIs(t, err, assert.AnError)
 	})
@@ -390,7 +390,7 @@ func TestClient_Query(t *testing.T) {
 			Query(mock.Anything, `SELECT id FROM bucket_2.users WHERE name = $1`, mock.Anything).
 			Return(nil, assert.AnError)
 
-		_, err := cm.Query(t.Context(), key, `SELECT id FROM {schema}.users WHERE name = $1`, "Alice")
+		_, err := cm.QueryPresher(t.Context(), key, `SELECT id FROM {schema}.users WHERE name = $1`, "Alice")
 		require.Error(t, err)
 		require.ErrorIs(t, err, assert.AnError)
 	})
@@ -427,7 +427,7 @@ func TestClient_QueryRow(t *testing.T) {
 			QueryRow(mock.Anything, `SELECT id FROM bucket_2.users WHERE name = $1`, mock.Anything).
 			Return(mockRow)
 
-		row := cm.QueryRow(t.Context(), key, `SELECT id FROM {schema}.users WHERE name = $1`, "Alice")
+		row := cm.QueryRowPresher(t.Context(), key, `SELECT id FROM {schema}.users WHERE name = $1`, "Alice")
 		require.NotNil(t, row)
 
 		var id string
@@ -449,7 +449,7 @@ func TestClient_QueryRow(t *testing.T) {
 			GetPool(mock.Anything).
 			Return(nil, assert.AnError)
 
-		row := cm.QueryRow(t.Context(), key, `SELECT id FROM {schema}.users WHERE name = $1`, "Alice")
+		row := cm.QueryRowPresher(t.Context(), key, `SELECT id FROM {schema}.users WHERE name = $1`, "Alice")
 		require.NotNil(t, row)
 
 		var id string
@@ -468,7 +468,7 @@ func TestClient_QueryRow(t *testing.T) {
 			GetShard(mock.Anything).
 			Return("", assert.AnError)
 
-		row := cm.QueryRow(t.Context(), key, `SELECT id FROM {schema}.users WHERE name = $1`, "Alice")
+		row := cm.QueryRowPresher(t.Context(), key, `SELECT id FROM {schema}.users WHERE name = $1`, "Alice")
 		require.NotNil(t, row)
 
 		var id string
