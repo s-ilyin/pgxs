@@ -74,3 +74,25 @@ func (c *Client) QueryRowPresher(ctx context.Context, key PreHasher, sql string,
 	bucketID := BucketID(HashKey(key.PreHash(), c.config.Buckets))
 	return c.QueryRowBucket(ctx, bucketID, sql, args...)
 }
+
+func (c *Client) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults {
+	bucketID, err := c.bucketFromContext(ctx)
+	if err != nil {
+		// Возвращаем ошибку через BatchResults, чтобы сохранить семантику pgx
+		return &batchResultsWithError{err: err}
+	}
+	return c.SendBatchBucket(ctx, bucketID, b)
+}
+
+func (c *Client) SendBatchBucket(ctx context.Context, bucketID BucketID, b *pgx.Batch) pgx.BatchResults {
+	pool, schema, err := c.getPoolByBucket(bucketID)
+	if err != nil {
+		return &batchResultsWithError{err: err}
+	}
+
+	for i := range b.QueuedQueries {
+		b.QueuedQueries[i].SQL = c.replaceSchema(b.QueuedQueries[i].SQL, schema)
+	}
+
+	return pool.SendBatch(ctx, b)
+}

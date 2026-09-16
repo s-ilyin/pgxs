@@ -3,12 +3,24 @@ package pgxs
 import (
 	"context"
 	"fmt"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type (
 	ctxPreHasherKey string
 	ctxBucketIDKey  string
+	ctxTxKey        string
 )
+
+func ContextWithTx(ctx context.Context, tx pgx.Tx) context.Context {
+	return context.WithValue(ctx, ctxTxKey("key_tx"), tx)
+}
+
+func FromContextTx(ctx context.Context) (pgx.Tx, bool) {
+	v, ok := ctx.Value(ctxTxKey("key_tx")).(pgx.Tx)
+	return v, ok
+}
 
 func ContextWithPreHasherKey(ctx context.Context, val PreHasher) context.Context {
 	return context.WithValue(ctx, ctxPreHasherKey("key_prehasher_id"), val)
