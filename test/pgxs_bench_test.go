@@ -58,7 +58,8 @@ func setupBenchClient(b *testing.B, dsn1, dsn2 string, batchTx bool) (*pgxs.Clie
 		Mapping:      mapping,
 	}
 
-	client, err := pgxs.New(context.Background(), cfg,
+	client, err := pgxs.New(
+		context.Background(), cfg,
 		pgxs.WithConcurrency(4),
 		pgxs.WithBatchTx(batchTx),
 	)
@@ -120,7 +121,7 @@ func buildBenchUsers(benchTag string, fixedBucket, count, iter int) []testUser {
 	return users
 }
 
-func insertQuery(u testUser) (string, []any) {
+func insertQuery(b pgxs.BucketID, u testUser) (string, []any) {
 	return `INSERT INTO {schema}.users (id, name, age) VALUES ($1, $2, $3) RETURNING id`,
 		[]any{u.ID, u.Name, u.Age}
 }
@@ -157,7 +158,8 @@ func runInsertBench(b *testing.B, benchTag string, fixedBucket int, dsn1, dsn2 s
 				iter++
 				users := buildBenchUsers(benchTag, fixedBucket, n, iter)
 
-				_, err := pgxs.Query(context.Background(), client, users,
+				_, err := pgxs.Query(
+					context.Background(), client, users,
 					func(u testUser) []byte { return u.ID.Prehash() },
 					insertQuery,
 					scanID,

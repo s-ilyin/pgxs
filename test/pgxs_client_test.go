@@ -325,7 +325,7 @@ func Test_Query_NoRetriesForInvalidSQL(t *testing.T) {
 			_, err = pgxs.Query(
 				t.Context(), client, users,
 				func(u testUser) []byte { return u.ID.Prehash() },
-				func(u testUser) (string, []any) {
+				func(b pgxs.BucketID, u testUser) (string, []any) {
 					queryCalls++
 					// Заведомо невалидный SQL → SQLSTATE 42601 (syntax_error),
 					// который НЕ входит в список retryable.
@@ -367,7 +367,7 @@ func Test_Query(t *testing.T) {
 		ids, err := pgxs.Query(
 			t.Context(), setup.client, users,
 			func(u testUser) []byte { return u.ID.Prehash() },
-			func(u testUser) (string, []any) {
+			func(b pgxs.BucketID, u testUser) (string, []any) {
 				return `INSERT INTO {schema}.users (id, name, age) VALUES ($1, $2, $3) RETURNING id`,
 					[]any{u.ID, u.Name, u.Age}
 			},
@@ -427,7 +427,7 @@ func Test_Query(t *testing.T) {
 		names, err := pgxs.Query(
 			t.Context(), setup.client, users,
 			func(u testUser) []byte { return u.ID.Prehash() },
-			func(u testUser) (string, []any) {
+			func(b pgxs.BucketID, u testUser) (string, []any) {
 				return `SELECT name FROM {schema}.users WHERE id = $1`, []any{u.ID}
 			},
 			func(rows pgx.Rows) (string, error) {
@@ -469,7 +469,7 @@ func Test_Query(t *testing.T) {
 		ids, err := pgxs.Query(
 			t.Context(), setup.client, users,
 			func(u testUser) []byte { return u.ID.Prehash() },
-			func(u testUser) (string, []any) {
+			func(b pgxs.BucketID, u testUser) (string, []any) {
 				return `UPDATE {schema}.users SET age = age + 1 WHERE id = $1 RETURNING id`, []any{u.ID}
 			},
 			func(rows pgx.Rows) (string, error) {
