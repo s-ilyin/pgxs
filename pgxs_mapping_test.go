@@ -12,7 +12,7 @@ func TestNewMapping(t *testing.T) {
 		Shards: []Shard{
 			{Name: "shard_1", DSN: "..."},
 		},
-		Mapping: []MappingEntry{
+		Mapping: []BucketMapping{
 			{Bucket: 0, Shard: "shard_1"},
 			{Bucket: 1, Shard: "shard_1"},
 		},

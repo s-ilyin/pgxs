@@ -31,10 +31,10 @@ func BenchmarkClientResolve(b *testing.B) {
 		Shards: []Shard{
 			{Name: "shard_1", DSN: "postgres://localhost:5432/db"},
 		},
-		Mapping: make([]MappingEntry, buckets),
+		Mapping: make([]BucketMapping, buckets),
 	}
 	for i := range buckets {
-		cfg.Mapping[i] = MappingEntry{Bucket: BucketID(i), Shard: "shard_1"}
+		cfg.Mapping[i] = BucketMapping{Bucket: BucketID(i), Shard: "shard_1"}
 	}
 
 	m, err := newMapping(cfg)

@@ -54,7 +54,7 @@ func setupTestClient(t *testing.T) setupTest {
 			{Name: "shard_1", DSN: dsn1},
 			{Name: "shard_2", DSN: dsn2},
 		},
-		Mapping: []pgxs.MappingEntry{
+		Mapping: []pgxs.BucketMapping{
 			{Bucket: 0, Shard: "shard_1"},
 			{Bucket: 1, Shard: "shard_1"},
 			{Bucket: 2, Shard: "shard_2"},
@@ -291,7 +291,7 @@ func Test_Query_NoRetriesForInvalidSQL(t *testing.T) {
 					{Name: "shard_1", DSN: dsn1},
 					{Name: "shard_2", DSN: dsn2},
 				},
-				Mapping: []pgxs.MappingEntry{
+				Mapping: []pgxs.BucketMapping{
 					{Bucket: 0, Shard: "shard_1"},
 					{Bucket: 1, Shard: "shard_1"},
 					{Bucket: 2, Shard: "shard_2"},

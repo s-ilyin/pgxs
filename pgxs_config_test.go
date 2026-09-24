@@ -14,7 +14,7 @@ func TestConfig_Validate(t *testing.T) {
 			Shards: []Shard{
 				{Name: "shard_1", DSN: "postgres://user:pass@localhost:5432/db"},
 			},
-			Mapping: []MappingEntry{
+			Mapping: []BucketMapping{
 				{Bucket: 0, Shard: "shard_1"},
 				{Bucket: 1, Shard: "shard_1"},
 				{Bucket: 2, Shard: "shard_1"},
@@ -32,7 +32,7 @@ func TestConfig_Validate(t *testing.T) {
 			Shards: []Shard{
 				{Name: "shard_1", DSN: "postgres://..."},
 			},
-			Mapping: []MappingEntry{},
+			Mapping: []BucketMapping{},
 		}
 		err := cfg.Validate()
 		require.Error(t, err)
@@ -46,7 +46,7 @@ func TestConfig_Validate(t *testing.T) {
 			Shards: []Shard{
 				{Name: "shard_1", DSN: "postgres://..."},
 			},
-			Mapping: []MappingEntry{
+			Mapping: []BucketMapping{
 				{Bucket: 0, Shard: "shard_1"},
 				{Bucket: 2, Shard: "shard_1"}, // bucket out of range
 			},
@@ -63,7 +63,7 @@ func TestConfig_Validate(t *testing.T) {
 			Shards: []Shard{
 				{Name: "shard_1", DSN: "postgres://..."},
 			},
-			Mapping: []MappingEntry{
+			Mapping: []BucketMapping{
 				{Bucket: 0, Shard: "shard_2"},
 			},
 		}

@@ -35,7 +35,7 @@ func setupBenchClient(b *testing.B, dsn1, dsn2 string, batchTx bool) (*pgxs.Clie
 	multi := dsn2 != ""
 
 	shards := []pgxs.Shard{{Name: "shard_1", DSN: dsn1}}
-	mapping := []pgxs.MappingEntry{
+	mapping := []pgxs.BucketMapping{
 		{Bucket: 0, Shard: "shard_1"},
 		{Bucket: 1, Shard: "shard_1"},
 		{Bucket: 2, Shard: "shard_1"},
@@ -43,7 +43,7 @@ func setupBenchClient(b *testing.B, dsn1, dsn2 string, batchTx bool) (*pgxs.Clie
 	}
 	if multi {
 		shards = append(shards, pgxs.Shard{Name: "shard_2", DSN: dsn2})
-		mapping = []pgxs.MappingEntry{
+		mapping = []pgxs.BucketMapping{
 			{Bucket: 0, Shard: "shard_1"},
 			{Bucket: 1, Shard: "shard_1"},
 			{Bucket: 2, Shard: "shard_2"},

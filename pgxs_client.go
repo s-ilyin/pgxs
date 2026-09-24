@@ -90,7 +90,7 @@ func DefaultConcurrency(shards int) int {
 	return want
 }
 
-// NewClient создаёт новый клиент с заданным конфигом и опциями.
+// New создаёт новый клиент с заданным конфигом и опциями.
 func New(ctx context.Context, cfg *Config, opts ...ClientOption) (*Client, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -143,7 +143,7 @@ func (c *Client) resolve(bucketID BucketID) (shardName, schemaName string, err e
 		return "", "", err
 	}
 	if int(bucketID) >= len(c.schemaNames) {
-		return "", "", fmt.Errorf("bucket %d out of schema cache range", bucketID)
+		return "", "", fmt.Errorf("bucket %d out of schema range", bucketID)
 	}
 	return shard, c.schemaNames[bucketID], nil
 }
@@ -152,7 +152,7 @@ func (c *Client) replaceSchema(sql, schema string) string {
 	if c.schemaReplacer != nil {
 		return c.schemaReplacer(sql, schema)
 	}
-	return strings.ReplaceAll(sql, "{schema}", schema)
+	return strings.ReplaceAll(sql, BucketPattern, schema)
 }
 
 func (c *Client) getPoolByBucket(bucketID BucketID) (RetryPool, string, error) {

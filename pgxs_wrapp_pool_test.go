@@ -173,7 +173,7 @@ func TestNewPool(t *testing.T) {
 			Shards: []Shard{
 				{Name: "shard_1", DSN: "invalid-dsn://%%%"},
 			},
-			Mapping: []MappingEntry{
+			Mapping: []BucketMapping{
 				{Bucket: 0, Shard: "shard_1"},
 				{Bucket: 1, Shard: "shard_1"},
 				{Bucket: 2, Shard: "shard_1"},
@@ -195,7 +195,7 @@ func TestNewPool(t *testing.T) {
 			Shards: []Shard{
 				{Name: "shard_1", DSN: "postgres://user:pass@localhost:1/db"},
 			},
-			Mapping: []MappingEntry{
+			Mapping: []BucketMapping{
 				{Bucket: 0, Shard: "shard_1"},
 				{Bucket: 1, Shard: "shard_1"},
 				{Bucket: 2, Shard: "shard_1"},

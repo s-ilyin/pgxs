@@ -5,6 +5,8 @@ import (
 	"strconv"
 )
 
+const BucketPattern = "{schema}"
+
 // BucketID представляет номер бакета (схемы) - bucket id.
 type BucketID uint
 

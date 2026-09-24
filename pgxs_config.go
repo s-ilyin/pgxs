@@ -13,7 +13,7 @@ type Shard struct {
 	DSN  string
 }
 
-type MappingEntry struct {
+type BucketMapping struct {
 	Bucket BucketID
 	Shard  string
 }
@@ -22,7 +22,7 @@ type Config struct {
 	Buckets      MaxBuckets
 	SchemaPrefix string
 	Shards       []Shard
-	Mapping      []MappingEntry
+	Mapping      []BucketMapping
 	Retry        RetryConfig
 }
 
