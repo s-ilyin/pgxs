@@ -43,6 +43,10 @@ func FromContextBucketIDKey(ctx context.Context) (BucketID, bool) {
 func (c *Client) bucketFromContext(ctx context.Context) (BucketID, error) {
 	bucketID, ok := FromContextBucketIDKey(ctx)
 	if ok {
+		if err := bucketID.Validate(c.config.Buckets); err != nil {
+			return 0, fmt.Errorf("bucket from context: %w", err)
+		}
+
 		return bucketID, nil
 	}
 

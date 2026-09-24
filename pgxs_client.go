@@ -138,12 +138,14 @@ func (c *Client) Close() {
 // ---- Вспомогательные методы ----
 
 func (c *Client) resolve(bucketID BucketID) (shardName, schemaName string, err error) {
+	err = bucketID.Validate(c.config.Buckets)
+	if err != nil {
+		return "", "", fmt.Errorf("resolve bucket: %w", err)
+	}
+
 	shard, err := c.mapping.GetShard(bucketID)
 	if err != nil {
 		return "", "", err
-	}
-	if int(bucketID) >= len(c.schemaNames) {
-		return "", "", fmt.Errorf("bucket %d out of schema range", bucketID)
 	}
 	return shard, c.schemaNames[bucketID], nil
 }

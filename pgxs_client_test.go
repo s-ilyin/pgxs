@@ -161,12 +161,8 @@ func TestClient_resolve(t *testing.T) {
 		t.Parallel()
 		cm := clientMocks(t)
 
-		cm.mappingMock.EXPECT().
-			GetShard(BucketID(5)).
-			Return("", assert.AnError)
-
 		_, _, err := cm.resolve(BucketID(5))
-		require.ErrorIs(t, err, assert.AnError)
+		require.Error(t, err)
 	})
 }
 
