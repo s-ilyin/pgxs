@@ -96,7 +96,7 @@ func TestClient_Begin(t *testing.T) {
 		key := testPrehasher("user_key")
 
 		// Вычисляем bucketID из ключа
-		bucketID := BucketID(HashKey(key.PreHash(), cm.config.Buckets))
+		bucketID := BucketID(HashKey(key.Prehash(), cm.config.Buckets))
 
 		cm.mappingMock.EXPECT().
 			GetShard(bucketID).
@@ -122,7 +122,7 @@ func TestClient_Begin(t *testing.T) {
 		cm := clientMocks(t)
 		key := testPrehasher("user_key")
 
-		bucketID := BucketID(HashKey(key.PreHash(), 4))
+		bucketID := BucketID(HashKey(key.Prehash(), 4))
 		cm.mappingMock.EXPECT().
 			GetShard(bucketID).
 			Return(mock.Anything, nil)
@@ -140,7 +140,7 @@ func TestClient_Begin(t *testing.T) {
 		cm := clientMocks(t)
 		key := testPrehasher("user_key")
 
-		bucketID := BucketID(HashKey(key.PreHash(), 4))
+		bucketID := BucketID(HashKey(key.Prehash(), 4))
 		cm.mappingMock.EXPECT().
 			GetShard(bucketID).
 			Return(mock.Anything, assert.AnError)
@@ -155,7 +155,7 @@ func TestClient_Begin(t *testing.T) {
 		cm := clientMocks(t)
 		key := testPrehasher("user_key")
 
-		bucketID := BucketID(HashKey(key.PreHash(), 4))
+		bucketID := BucketID(HashKey(key.Prehash(), 4))
 		cm.mappingMock.EXPECT().
 			GetShard(bucketID).
 			Return(mock.Anything, nil)

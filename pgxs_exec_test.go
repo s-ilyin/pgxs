@@ -20,7 +20,7 @@ func TestExec(t *testing.T) {
 
 	var (
 		prehasher    = func(i testItem) []byte { return []byte(i.ID) }
-		queryBuilder = func(i testItem) (string, []any) {
+		queryBuilder = func(_ BucketID, i testItem) (string, []any) {
 			return `INSERT INTO {schema}.users (id, name) VALUES ($1, $2)`, []any{i.ID, i.Name}
 		}
 	)

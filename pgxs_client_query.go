@@ -60,18 +60,18 @@ func (c *Client) QueryRowBucket(ctx context.Context, bucketID BucketID, sql stri
 	return pool.QueryRow(ctx, sql, args...)
 }
 
-func (c *Client) ExecPresher(ctx context.Context, key PreHasher, sql string, args ...any) (pgconn.CommandTag, error) {
-	bucketID := BucketID(HashKey(key.PreHash(), c.config.Buckets))
+func (c *Client) ExecPresher(ctx context.Context, key Prehasher, sql string, args ...any) (pgconn.CommandTag, error) {
+	bucketID := BucketID(HashKey(key.Prehash(), c.config.Buckets))
 	return c.ExecBucket(ctx, bucketID, sql, args...)
 }
 
-func (c *Client) QueryPresher(ctx context.Context, key PreHasher, sql string, args ...any) (pgx.Rows, error) {
-	bucketID := BucketID(HashKey(key.PreHash(), c.config.Buckets))
+func (c *Client) QueryPresher(ctx context.Context, key Prehasher, sql string, args ...any) (pgx.Rows, error) {
+	bucketID := BucketID(HashKey(key.Prehash(), c.config.Buckets))
 	return c.QueryBucket(ctx, bucketID, sql, args...)
 }
 
-func (c *Client) QueryRowPresher(ctx context.Context, key PreHasher, sql string, args ...any) pgx.Row {
-	bucketID := BucketID(HashKey(key.PreHash(), c.config.Buckets))
+func (c *Client) QueryRowPresher(ctx context.Context, key Prehasher, sql string, args ...any) pgx.Row {
+	bucketID := BucketID(HashKey(key.Prehash(), c.config.Buckets))
 	return c.QueryRowBucket(ctx, bucketID, sql, args...)
 }
 

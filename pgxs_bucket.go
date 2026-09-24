@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-// BID представляет номер бакета (схемы) - bucket id.
+// BucketID представляет номер бакета (схемы) - bucket id.
 type BucketID uint
 
 // MaxBuckets представляет максимальное количество бакетов в кластере.

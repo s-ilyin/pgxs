@@ -55,7 +55,7 @@ func Exec[T any](
 	client *Client,
 	rows []T,
 	prehasher func(T) []byte,
-	query func(T) (sql string, args []any),
+	query func(BucketID, T) (sql string, args []any),
 ) (*ExecResult, error) {
 	type rowWithBucket struct {
 		row      T
@@ -124,7 +124,7 @@ func Exec[T any](
 
 				batch := &pgx.Batch{}
 				for _, entry := range entries {
-					sql, args := query(entry.row)
+					sql, args := query(entry.bucketID, entry.row)
 					schema := client.config.SchemaPrefix + strconv.Itoa(entry.bucketID.Int())
 					sql = client.replaceSchema(sql, schema)
 					batch.Queue(sql, args...)

@@ -4,8 +4,8 @@ import (
 	"github.com/cespare/xxhash/v2"
 )
 
-type PreHasher interface {
-	PreHash() []byte
+type Prehasher interface {
+	Prehash() []byte
 }
 
 func BucketIdFromHash(preKeyHash []byte, maxBuckets MaxBuckets) BucketID {
@@ -16,4 +16,8 @@ func BucketIdFromHash(preKeyHash []byte, maxBuckets MaxBuckets) BucketID {
 func HashKey(preKeyHash []byte, maxBuckets MaxBuckets) uint {
 	h := xxhash.Sum64(preKeyHash)
 	return uint(h % uint64(maxBuckets))
+}
+
+func (c *Client) BucketIdFromHash(prehash []byte) BucketID {
+	return BucketIdFromHash(prehash, c.config.Buckets)
 }

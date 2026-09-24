@@ -18,7 +18,7 @@ func TestQuery(t *testing.T) {
 	}
 
 	prehasher := func(i testItem) []byte { return []byte(i.ID) }
-	queryBuilder := func(i testItem) (string, []any) {
+	queryBuilder := func(_ BucketID, i testItem) (string, []any) {
 		return `SELECT id FROM {schema}.users WHERE name = $1`, []any{i.Name}
 	}
 

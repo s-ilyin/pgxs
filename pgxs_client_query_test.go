@@ -13,7 +13,7 @@ import (
 // testPrehasher — реализация PreHasher для тестов
 type testPrehasher string
 
-func (t testPrehasher) PreHash() []byte { return []byte(t) }
+func (t testPrehasher) Prehash() []byte { return []byte(t) }
 
 func TestClient_ExecBucket(t *testing.T) {
 	t.Parallel()

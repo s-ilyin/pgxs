@@ -33,7 +33,7 @@ func Query[T any, R any](
 	client *Client,
 	src []T,
 	prehasher func(T) []byte,
-	query func(T) (sql string, args []any),
+	query func(BucketID, T) (sql string, args []any),
 	scanRows func(pgx.Rows) (R, error),
 ) ([]R, error) {
 	if scanRows == nil {
@@ -109,7 +109,7 @@ func Query[T any, R any](
 
 				batch := &pgx.Batch{}
 				for _, entry := range entries {
-					sql, args := query(entry.row)
+					sql, args := query(entry.bucketID, entry.row)
 					schema := client.config.SchemaPrefix + strconv.Itoa(entry.bucketID.Int())
 					sql = client.replaceSchema(sql, schema)
 					batch.Queue(sql, args...)

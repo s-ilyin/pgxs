@@ -9,20 +9,20 @@ import (
 )
 
 type Shard struct {
-	Name string `json:"name"`
-	DSN  string `json:"dsn"`
+	Name string
+	DSN  string
 }
 
 type MappingEntry struct {
-	Bucket BucketID `json:"bucket"`
-	Shard  string   `json:"shard"`
+	Bucket BucketID
+	Shard  string
 }
 
 type Config struct {
-	Buckets      MaxBuckets     `json:"buckets"`
-	SchemaPrefix string         `json:"schema_prefix"`
-	Shards       []Shard        `json:"shards"`
-	Mapping      []MappingEntry `json:"mapping"`
+	Buckets      MaxBuckets
+	SchemaPrefix string
+	Shards       []Shard
+	Mapping      []MappingEntry
 	Retry        RetryConfig
 }
 

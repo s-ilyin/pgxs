@@ -24,13 +24,13 @@ func (c *Client) Begin(ctx context.Context) (pgx.Tx, error) {
 	return c.BeginBucket(ctx, bucketID)
 }
 
-func (c *Client) BeginTxPreHasher(ctx context.Context, key PreHasher, txOptions pgx.TxOptions) (pgx.Tx, error) {
-	bucketID := BucketID(HashKey(key.PreHash(), c.config.Buckets))
+func (c *Client) BeginTxPreHasher(ctx context.Context, key Prehasher, txOptions pgx.TxOptions) (pgx.Tx, error) {
+	bucketID := BucketID(HashKey(key.Prehash(), c.config.Buckets))
 	return c.BeginTxBucket(ctx, bucketID, txOptions)
 }
 
-func (c *Client) BeginPreHasher(ctx context.Context, key PreHasher) (pgx.Tx, error) {
-	bucketID := BucketID(HashKey(key.PreHash(), c.config.Buckets))
+func (c *Client) BeginPreHasher(ctx context.Context, key Prehasher) (pgx.Tx, error) {
+	bucketID := BucketID(HashKey(key.Prehash(), c.config.Buckets))
 	return c.BeginBucket(ctx, bucketID)
 }
 

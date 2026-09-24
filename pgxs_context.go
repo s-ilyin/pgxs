@@ -22,12 +22,12 @@ func FromContextTx(ctx context.Context) (pgx.Tx, bool) {
 	return v, ok
 }
 
-func ContextWithPreHasherKey(ctx context.Context, val PreHasher) context.Context {
+func ContextWithPreHasherKey(ctx context.Context, val Prehasher) context.Context {
 	return context.WithValue(ctx, ctxPreHasherKey("key_prehasher_id"), val)
 }
 
-func FromContextPreHasherKey(ctx context.Context) (PreHasher, bool) {
-	v, ok := ctx.Value(ctxPreHasherKey("key_prehasher_id")).(PreHasher)
+func FromContextPreHasherKey(ctx context.Context) (Prehasher, bool) {
+	v, ok := ctx.Value(ctxPreHasherKey("key_prehasher_id")).(Prehasher)
 	return v, ok
 }
 
@@ -51,5 +51,5 @@ func (c *Client) bucketFromContext(ctx context.Context) (BucketID, error) {
 		return 0, fmt.Errorf("no BucketID or PreHasher in context")
 	}
 
-	return BucketIdFromHash(hasher.PreHash(), c.config.Buckets), nil
+	return BucketIdFromHash(hasher.Prehash(), c.config.Buckets), nil
 }

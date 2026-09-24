@@ -32,7 +32,7 @@ type testUserWithBucketID struct {
 type KeyShardID string
 
 // реализует PreHasher
-func (u KeyShardID) PreHash() []byte {
+func (u KeyShardID) Prehash() []byte {
 	return []byte(u)
 }
 
@@ -65,7 +65,8 @@ func setupTestClient(t *testing.T) setupTest {
 		buckets: map[pgxs.BucketID]*pgxpool.Pool{},
 	}
 
-	client, err := pgxs.New(t.Context(), cfg,
+	client, err := pgxs.New(
+		t.Context(), cfg,
 		pgxs.WithConcurrency(4),
 		pgxs.WithBatchTx(true),
 	)
@@ -145,7 +146,7 @@ func TestClient_Exec(t *testing.T) {
 		require.NoError(t, err)
 
 		// 2. Вычисляем bucketID ТОЧНО ТАК ЖЕ, как это делает клиент
-		bucketID := pgxs.BucketID(pgxs.HashKey(want.ID.PreHash(), 4))
+		bucketID := pgxs.BucketID(pgxs.HashKey(want.ID.Prehash(), 4))
 
 		// 3. Проверяем через прямой пул
 		p := setup.buckets[bucketID]
@@ -193,7 +194,7 @@ func TestClient_Query(t *testing.T) {
 		}
 
 		insertTestData(t, setup, testUserWithBucketID{
-			bucketID: pgxs.BucketID(pgxs.HashKey(want.ID.PreHash(), 4)),
+			bucketID: pgxs.BucketID(pgxs.HashKey(want.ID.Prehash(), 4)),
 			value:    want,
 		})
 
@@ -243,9 +244,10 @@ func Test_Exec(t *testing.T) {
 			{ID: KeyShardID("b3"), Name: "Bulk3", Age: 30},
 		}
 
-		result, err := pgxs.Exec(t.Context(), setup.client, users,
-			func(u testUser) []byte { return u.ID.PreHash() },
-			func(u testUser) (string, []any) {
+		result, err := pgxs.Exec(
+			t.Context(), setup.client, users,
+			func(u testUser) []byte { return u.ID.Prehash() },
+			func(b pgxs.BucketID, u testUser) (string, []any) {
 				return `INSERT INTO {schema}.users (id, name, age) VALUES ($1, $2, $3)`,
 					[]any{u.ID, u.Name, u.Age}
 			},
@@ -304,7 +306,8 @@ func Test_Query_NoRetriesForInvalidSQL(t *testing.T) {
 				},
 			}
 
-			client, err := pgxs.New(t.Context(), cfg,
+			client, err := pgxs.New(
+				t.Context(), cfg,
 				pgxs.WithBatchTx(batchTx),
 			)
 			require.NoError(t, err)
@@ -319,8 +322,9 @@ func Test_Query_NoRetriesForInvalidSQL(t *testing.T) {
 				{ID: KeyShardID("bad3")},
 			}
 
-			_, err = pgxs.Query(t.Context(), client, users,
-				func(u testUser) []byte { return u.ID.PreHash() },
+			_, err = pgxs.Query(
+				t.Context(), client, users,
+				func(u testUser) []byte { return u.ID.Prehash() },
 				func(u testUser) (string, []any) {
 					queryCalls++
 					// Заведомо невалидный SQL → SQLSTATE 42601 (syntax_error),
@@ -360,8 +364,9 @@ func Test_Query(t *testing.T) {
 			{ID: KeyShardID("q3"), Name: "Query3", Age: 33},
 		}
 
-		ids, err := pgxs.Query(t.Context(), setup.client, users,
-			func(u testUser) []byte { return u.ID.PreHash() },
+		ids, err := pgxs.Query(
+			t.Context(), setup.client, users,
+			func(u testUser) []byte { return u.ID.Prehash() },
 			func(u testUser) (string, []any) {
 				return `INSERT INTO {schema}.users (id, name, age) VALUES ($1, $2, $3) RETURNING id`,
 					[]any{u.ID, u.Name, u.Age}
@@ -419,8 +424,9 @@ func Test_Query(t *testing.T) {
 			{ID: "s4"},
 		}
 
-		names, err := pgxs.Query(t.Context(), setup.client, users,
-			func(u testUser) []byte { return u.ID.PreHash() },
+		names, err := pgxs.Query(
+			t.Context(), setup.client, users,
+			func(u testUser) []byte { return u.ID.Prehash() },
 			func(u testUser) (string, []any) {
 				return `SELECT name FROM {schema}.users WHERE id = $1`, []any{u.ID}
 			},
@@ -460,8 +466,9 @@ func Test_Query(t *testing.T) {
 			{ID: "u2"},
 		}
 
-		ids, err := pgxs.Query(t.Context(), setup.client, users,
-			func(u testUser) []byte { return u.ID.PreHash() },
+		ids, err := pgxs.Query(
+			t.Context(), setup.client, users,
+			func(u testUser) []byte { return u.ID.Prehash() },
 			func(u testUser) (string, []any) {
 				return `UPDATE {schema}.users SET age = age + 1 WHERE id = $1 RETURNING id`, []any{u.ID}
 			},
@@ -656,7 +663,8 @@ func TestClient_ForEachRow(t *testing.T) {
 	)
 
 	t.Run("ForEachRow all rows", func(t *testing.T) {
-		ids, err := pgxs.ForEachRow(t.Context(), setup.client,
+		ids, err := pgxs.ForEachRow(
+			t.Context(), setup.client,
 			func(rows pgx.Rows) (string, error) {
 				var id string
 				err := rows.Scan(&id)
@@ -671,7 +679,8 @@ func TestClient_ForEachRow(t *testing.T) {
 	})
 
 	t.Run("ForEachRow with filter", func(t *testing.T) {
-		names, err := pgxs.ForEachRow(t.Context(), setup.client,
+		names, err := pgxs.ForEachRow(
+			t.Context(), setup.client,
 			func(rows pgx.Rows) (string, error) {
 				var name string
 				err := rows.Scan(&name)
@@ -686,7 +695,8 @@ func TestClient_ForEachRow(t *testing.T) {
 	})
 
 	t.Run("ForEachRow with error in handler", func(t *testing.T) {
-		_, err := pgxs.ForEachRow(t.Context(), setup.client,
+		_, err := pgxs.ForEachRow(
+			t.Context(), setup.client,
 			func(rows pgx.Rows) (string, error) {
 				var id string
 				if err := rows.Scan(&id); err != nil {
@@ -726,9 +736,10 @@ func TestClient_ErrorHandling(t *testing.T) {
 
 	t.Run("Bulk with empty items", func(t *testing.T) {
 		users := []testUser{}
-		result, err := pgxs.Exec(t.Context(), setup.client, users,
-			func(u testUser) []byte { return u.ID.PreHash() },
-			func(u testUser) (string, []any) {
+		result, err := pgxs.Exec(
+			t.Context(), setup.client, users,
+			func(u testUser) []byte { return u.ID.Prehash() },
+			func(b pgxs.BucketID, u testUser) (string, []any) {
 				return `INSERT INTO {schema}.users (id, name) VALUES ($1, $2)`,
 					[]any{u.ID, u.Name}
 			},

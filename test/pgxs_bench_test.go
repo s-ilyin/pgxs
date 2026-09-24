@@ -106,7 +106,7 @@ func buildBenchUsers(benchTag string, fixedBucket, count, iter int) []testUser {
 
 	for i := 0; len(users) < count; i++ {
 		id := KeyShardID(fmt.Sprintf("bench-%s-%d-%d", benchTag, iter, i))
-		bucket := int(pgxs.HashKey(id.PreHash(), 4))
+		bucket := int(pgxs.HashKey(id.Prehash(), 4))
 
 		if fixedBucket >= 0 && bucket != fixedBucket {
 			continue
@@ -158,7 +158,7 @@ func runInsertBench(b *testing.B, benchTag string, fixedBucket int, dsn1, dsn2 s
 				users := buildBenchUsers(benchTag, fixedBucket, n, iter)
 
 				_, err := pgxs.Query(context.Background(), client, users,
-					func(u testUser) []byte { return u.ID.PreHash() },
+					func(u testUser) []byte { return u.ID.Prehash() },
 					insertQuery,
 					scanID,
 				)
