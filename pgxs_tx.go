@@ -58,5 +58,8 @@ func (t *wrapTx) Prepare(ctx context.Context, name, sql string) (*pgconn.Stateme
 }
 
 func (t *wrapTx) SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults {
+	for i := range b.QueuedQueries {
+		b.QueuedQueries[i].SQL = t.client.replaceSchema(b.QueuedQueries[i].SQL, t.schema)
+	}
 	return t.tx.SendBatch(ctx, b)
 }
